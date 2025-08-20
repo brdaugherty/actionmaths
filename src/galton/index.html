@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galton Board Simulator</title>
+    <meta name="copyright" content="© 2025 Brian Daugherty. All rights reserved.">
+
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; /* Prevents scrollbars from appearing during animation */
+        }
+
+        canvas {
+            background-color: #1a202c; /* dark-900 */
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .bucket-counter {
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        .bucket-counter.highlight {
+            background-color: #4299e1; /* blue-400 */
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl mx-auto text-center">
+        <h1 class="text-3xl md:text-4xl font-bold text-blue-400 mb-2">Galton Board Simulator</h1>
+        <p class="text-lg text-gray-400 mb-2">Press the <kbd class="px-2 py-1.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg">Spacebar</kbd> to drop a ball.</p>
+        <p class="text-lg text-gray-300 mb-6">Total Balls In Buckets: <span id="totalCounter" class="font-bold text-blue-300">0</span></p>
+    </div>
+
+    <!-- Canvas for the Galton Board animation -->
+    <canvas id="galtonBoard" width="800" height="750"></canvas>
+
+    <!-- Container for the bucket counters -->
+    <div id="bucketCounters" class="flex justify-center items-end mt-4 space-x-1 w-full max-w-4xl mx-auto"></div>
+
+    <script>
+        // --- Canvas and Context Setup ---
+        const canvas = document.getElementById('galtonBoard');
+        const ctx = canvas.getContext('2d');
+
+        // --- Configuration ---
+        const DEPTH = 10; // Number of peg rows
+        const PEG_RADIUS = 5;
+        const BALL_RADIUS = 7;
+        const VERTICAL_SPACING = 60; // Vertical distance between rows
+        const HORIZONTAL_SPACING = 2 * VERTICAL_SPACING * Math.tan(Math.PI / 6); // tan(30 degrees)
+        // Animation duration reduced by 1/3 from 500ms to make it faster
+        const ANIMATION_DURATION = 333; // ~0.33 seconds per level drop
+
+        // --- State Management ---
+        let pegs = [];
+        let buckets = [];
+        let balls = [];
+        let bucketCounts = new Array(DEPTH + 1).fill(0);
+        let bucketFreqHz = new Array(DEPTH + 1).fill(440); // 440 Hz (A4)
+        let totalBallsDropped = 0; // Counter for total balls
+
+        // --- Utility Functions ---
+        /**
+         * Draws a circle on the canvas.
+         * @param {number} x - The x-coordinate of the circle's center.
+         * @param {number} y - The y-coordinate of the circle's center.
+         * @param {number} radius - The radius of the circle.
+         * @param {string} color - The fill color of the circle.
+         */
+        function drawCircle(x, y, radius, color) {
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        /**
+         * Sets up the positions for pegs and buckets.
+         */
+        function setupBoard() {
+            pegs = [];
+            const topOffset = 80; // Starting Y position for the first peg
+
+            // Calculate peg positions (Pascal's Triangle layout)
+            for (let row = 0; row < DEPTH; row++) {
+                const rowPegs = [];
+                const rowWidth = row * HORIZONTAL_SPACING;
+                const startX = (canvas.width - rowWidth) / 2;
+                for (let col = 0; col <= row; col++) {
+                    const x = startX + col * HORIZONTAL_SPACING;
+                    const y = topOffset + row * VERTICAL_SPACING;
+                    rowPegs.push({
+                        x,
+                        y
+                    });
+                }
+                pegs.push(rowPegs);
+            }
+
+            // Calculate bucket positions
+            buckets = [];
+            const bucketRowY = topOffset + DEPTH * VERTICAL_SPACING + 20;
+            const bucketRowWidth = DEPTH * HORIZONTAL_SPACING;
+            const startBucketX = (canvas.width - bucketRowWidth) / 2;
+            for (let i = 0; i <= DEPTH; i++) {
+                buckets.push({
+                    x: startBucketX + i * HORIZONTAL_SPACING,
+                    y: bucketRowY,
+                    width: HORIZONTAL_SPACING * 0.8,
+                    height: 50
+                });
+            }
+            setupBucketCounters();
+        }
+
+        /**
+         * Creates and initializes the counter display elements below the canvas.
+         */
+        function setupBucketCounters() {
+            const countersContainer = document.getElementById('bucketCounters');
+            countersContainer.innerHTML = ''; // Clear existing counters
+            bucketCounts.forEach((count, index) => {
+                const counterDiv = document.createElement('div');
+                counterDiv.className = 'bucket-counter bg-gray-700 text-white font-bold py-2 rounded-t-lg text-center';
+                counterDiv.style.width = `${HORIZONTAL_SPACING * 0.8}px`;
+                counterDiv.style.minHeight = '40px';
+                counterDiv.id = `bucket-${index}`;
+                counterDiv.textContent = count;
+                countersContainer.appendChild(counterDiv);
+            });
+        }
+
+        /**
+         * Draws the entire board: pegs and buckets.
+         */
+        function drawBoard() {
+            // Draw pegs
+            ctx.fillStyle = '#90cdf4'; // light-blue-300
+            pegs.forEach(row => {
+                row.forEach(peg => {
+                    drawCircle(peg.x, peg.y, PEG_RADIUS, '#90cdf4');
+                });
+            });
+
+            // Draw buckets
+            ctx.fillStyle = '#4a5568'; // gray-600
+            buckets.forEach(bucket => {
+                ctx.fillRect(bucket.x - bucket.width / 2, bucket.y, bucket.width, bucket.height);
+            });
+        }
+
+        /**
+         * Creates a new ball at the top of the board and starts its journey.
+         */
+        function releaseBall() {
+            const startPeg = pegs[0][0];
+            const newBall = {
+                startX: startPeg.x,
+                startY: startPeg.y - VERTICAL_SPACING, // Start above the first peg
+                targetX: startPeg.x,
+                targetY: startPeg.y,
+                x: startPeg.x,
+                y: startPeg.y - VERTICAL_SPACING,
+                row: 0,
+                col: 0,
+                startTime: Date.now(),
+                color: `hsl(${Math.random() * 360}, 70%, 60%)`
+            };
+            balls.push(newBall);
+        }
+
+        /**
+         * Play a sound when a ball lands in a bucket, lower tones near the mean
+	 * and higher tones further from the middle of the board.
+         */
+        function playTone(finalCol) {
+
+            // Create an oscillator node
+            const oscillator = audioContext.createOscillator();
+
+            // Set the oscillator type (e.g., 'sine', 'square', 'sawtooth', 'triangle')
+            oscillator.type = 'triangle';
+
+            // Set the frequency of the tone in Hz
+            let freqHz = bucketFreqHz[finalCol];
+            oscillator.frequency.setValueAtTime(freqHz, audioContext.currentTime);
+
+            // Connect the oscillator to the audio output (speakers)
+            oscillator.connect(audioContext.destination);
+
+            // Start the oscillator to play tone
+            oscillator.start();
+
+            // Stop the oscillator after N milliseconds
+            const msDuration = 100
+            setTimeout(() => {
+                oscillator.stop();
+            }, msDuration);
+        }
+
+        /**
+         * Updates the state and position of all active balls.
+         * This function contains the corrected logic.
+         */
+        function updateBalls() {
+            // Iterate backwards to safely remove items from the array while looping.
+            for (let i = balls.length - 1; i >= 0; i--) {
+                const ball = balls[i];
+                const elapsedTime = Date.now() - ball.startTime;
+                const progress = Math.min(elapsedTime / ANIMATION_DURATION, 1);
+
+                // Linear interpolation for smooth movement
+                ball.x = ball.startX + (ball.targetX - ball.startX) * progress;
+                ball.y = ball.startY + (ball.targetY - ball.startY) * progress;
+
+                // When the ball's animation for the current step is complete
+                if (progress >= 1) {
+                    // Case 1: The ball was falling into a bucket and has now landed.
+                    if (ball.row === DEPTH) {
+                        const finalCol = ball.finalBucketIndex; // Use the stored bucket index
+                        if (finalCol !== undefined) {
+                            bucketCounts[finalCol]++;
+                            totalBallsDropped++;
+                            updateCounter(finalCol);
+                            document.getElementById('totalCounter').textContent = totalBallsDropped;
+
+                            playTone(finalCol);
+                        }
+                        balls.splice(i, 1); // Remove the ball from the simulation
+                    }
+                    // Case 2: The ball just hit the last row of pegs.
+                    else if (ball.row === DEPTH - 1) {
+                        // Decide the final turn and set up the fall into a bucket.
+                        const goRight = Math.random() < 0.5;
+                        const finalCol = ball.col + (goRight ? 1 : 0);
+
+                        ball.startX = ball.targetX;
+                        ball.startY = ball.targetY;
+                        ball.targetX = buckets[finalCol].x;
+                        ball.targetY = buckets[finalCol].y + buckets[finalCol].height - BALL_RADIUS;
+                        ball.startTime = Date.now();
+
+                        // Set a flag (row=DEPTH) and store the final destination.
+                        ball.row = DEPTH;
+                        ball.finalBucketIndex = finalCol;
+                    }
+                    // Case 3: The ball hit a regular peg.
+                    else {
+                        // Move to the next peg in the triangle.
+                        ball.row++;
+                        const goRight = Math.random() < 0.5;
+                        if (goRight) {
+                            ball.col++;
+                        }
+
+                        ball.startX = ball.targetX;
+                        ball.startY = ball.targetY;
+
+                        const nextPeg = pegs[ball.row][ball.col];
+                        ball.targetX = nextPeg.x;
+                        ball.targetY = nextPeg.y;
+                        ball.startTime = Date.now();
+                    }
+                }
+            }
+        }
+
+        /**
+         * Updates the display of a single bucket counter and adds a highlight effect.
+         * @param {number} index - The index of the bucket to update.
+         */
+        function updateCounter(index) {
+            const counterEl = document.getElementById(`bucket-${index}`);
+            if (counterEl) {
+                counterEl.textContent = bucketCounts[index];
+                counterEl.classList.add('highlight');
+                // Remove the highlight after a short delay to create a flash effect
+                setTimeout(() => {
+                    counterEl.classList.remove('highlight');
+                }, 300);
+            }
+        }
+
+        /**
+         * The main animation loop.
+         */
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
+            drawBoard();
+            updateBalls();
+            // Draw balls after updating their positions
+            balls.forEach(ball => {
+                drawCircle(ball.x, ball.y, BALL_RADIUS, ball.color);
+            });
+            requestAnimationFrame(animate); // Loop
+        }
+
+        // --- Event Listeners ---
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault(); // Prevent default spacebar action (e.g., scrolling)
+                releaseBall();
+            }
+        });
+
+        // Handle window resizing
+        function onResize() {
+            const container = canvas.parentElement;
+            const randoWidthMax = 620; // Just a guess
+            const size = Math.min(container.clientWidth, randoWidthMax);
+
+            canvas.style.width = `${size}px`;
+            canvas.style.height = `${size * (750/800)}px`;
+        }
+        window.addEventListener('resize', onResize);
+
+        // Create an AudioContext
+        const audioContext = new(window.AudioContext || window.webkitAudioContext)();
+
+	// Increase the tone when a ball falls in a bucket further from the mean
+	let freqHz = 1040;
+        for (let i = 0; i <= DEPTH / 2; i++) {
+	    bucketFreqHz[i] = freqHz;
+	    bucketFreqHz[DEPTH - i] = freqHz;
+            freqHz -= 140;
+        }
+
+        // --- Initialization ---
+        setupBoard();
+        onResize();
+        animate();
+    </script>
+</body>
+
+</html>
