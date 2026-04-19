@@ -230,6 +230,7 @@
         
         // Let 1 unit = 10nm for drawing scale (arbitrary visual scaling)
         const PIXEL_TO_NM = 20; 
+        const C_SPEED = 2; // Speed of light in px per frame
         
         let state = {
             lambda: 500, // nm
@@ -321,14 +322,18 @@
             const slitOffset = (Math.random() > 0.5 ? 1 : -1) * (state.d / PIXEL_TO_NM / 2);
             const slitX = W/2 + slitOffset;
             
+            const dist1 = Math.hypot(slitX - W/2, Y_BARRIER - Y_SOURCE);
+            const dist2 = Math.hypot(destX - slitX, Y_SCREEN - Y_BARRIER);
+            
             activePhotons.push({
                 x: W/2, // start at source
                 y: Y_SOURCE,
                 destX: destX,
                 slitX: slitX,
                 stage: 0, // 0 = moving to slit, 1 = moving to screen, 2 = hit
-                progress: 0,
-                speed: 0.05 + Math.random() * 0.02
+                distTraveled: 0,
+                dist1: dist1,
+                dist2: dist2
             });
         }
 
@@ -371,8 +376,7 @@
                 
                 // Visual wavelength mapping
                 const visualLambda = state.lambda / 20; 
-                const waveSpeed = 1;
-                state.time += waveSpeed;
+                state.time += C_SPEED;
 
                 const maxR = 400; // max radius to draw
                 for (let r = (state.time % visualLambda); r < maxR; r += visualLambda) {
@@ -398,6 +402,15 @@
             // Screen
             simCtx.fillRect(0, Y_SCREEN, W, 10);
             
+            // Labels
+            simCtx.fillStyle = '#94a3b8'; // text-muted color
+            simCtx.font = '12px Inter, sans-serif';
+            simCtx.textAlign = 'left';
+            simCtx.fillText('Photon Source', 10, Y_SOURCE + 4);
+            simCtx.fillText('Double Slit Barrier', 10, Y_BARRIER - 10);
+            simCtx.textAlign = 'right';
+            simCtx.fillText('Detector Screen', W - 10, Y_SCREEN - 10);
+            
             // Source dot
             simCtx.fillStyle = '#fff';
             simCtx.beginPath();
@@ -407,21 +420,21 @@
             // 3. Update & Draw Photons
             for (let i = activePhotons.length - 1; i >= 0; i--) {
                 const p = activePhotons[i];
-                p.progress += p.speed;
+                p.distTraveled += C_SPEED; // Move at exactly the speed of light
                 
                 if (p.stage === 0) {
-                    p.x = W/2 + (p.slitX - W/2) * p.progress;
-                    p.y = Y_SOURCE + (Y_BARRIER - Y_SOURCE) * p.progress;
-                    if (p.progress >= 1) {
+                    let progress = p.distTraveled / p.dist1;
+                    if (progress >= 1) {
                         p.stage = 1;
-                        p.progress = 0;
-                        p.x = p.slitX;
-                        p.y = Y_BARRIER;
+                        p.distTraveled -= p.dist1; // Carry over remaining distance to next stage
+                        progress = 1;
                     }
-                } else if (p.stage === 1) {
-                    p.x = p.slitX + (p.destX - p.slitX) * p.progress;
-                    p.y = Y_BARRIER + (Y_SCREEN - Y_BARRIER) * p.progress;
-                    if (p.progress >= 1) {
+                    p.x = W/2 + (p.slitX - W/2) * progress;
+                    p.y = Y_SOURCE + (Y_BARRIER - Y_SOURCE) * progress;
+                } 
+                if (p.stage === 1) {
+                    let progress = p.distTraveled / p.dist2;
+                    if (progress >= 1) {
                         // Hit screen!
                         histogram[p.destX]++;
                         state.photonsDetected++;
@@ -429,6 +442,8 @@
                         activePhotons.splice(i, 1);
                         continue;
                     }
+                    p.x = p.slitX + (p.destX - p.slitX) * progress;
+                    p.y = Y_BARRIER + (Y_SCREEN - Y_BARRIER) * progress;
                 }
                 
                 simCtx.fillStyle = colorRgb;
@@ -499,8 +514,14 @@
 
         // --- Event Listeners ---
         document.getElementById('btn-fire').addEventListener('click', () => {
-            // Fire 5 at a time for better visual feedback when clicking
-            for(let i=0; i<5; i++) firePhoton();
+            firePhoton();
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault(); // Prevent page scrolling
+                firePhoton();
+            }
         });
         document.getElementById('btn-stream').addEventListener('click', toggleStream);
         document.getElementById('btn-wave').addEventListener('click', toggleWave);
