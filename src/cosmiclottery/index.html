@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quantum Wave Collapse - Dyson Sphere</title>
+    <title>The Cosmic Lottery - Quantum Probability</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -136,6 +136,35 @@
             align-items: center;
         }
 
+        /* Lottery UI */
+        .lottery-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 10;
+            background: var(--panel-bg);
+            backdrop-filter: blur(8px);
+            border: 1px solid #8b5cf6;
+            border-radius: 12px;
+            padding: 24px;
+            width: 300px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            pointer-events: auto;
+        }
+        .lottery-panel h3 { margin: 0 0 10px 0; color: #8b5cf6; font-size: 1.1rem; }
+        .lottery-panel p { margin: 0 0 15px 0; font-size: 0.85rem; color: var(--text-muted); }
+        .bar-container {
+            width: 100%; height: 24px; background: #1e293b; border-radius: 12px;
+            display: flex; position: relative; overflow: hidden; border: 1px solid var(--border);
+        }
+        .bar-hit { background: #ef4444; color: white; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .bar-pass { background: #3b82f6; color: white; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .marker {
+            position: absolute; top: 0; bottom: 0; width: 4px; background: #fff;
+            transition: left 0.1s; left: 0%; opacity: 0; box-shadow: 0 0 5px white;
+        }
+        .result { margin-top: 15px; font-weight: bold; text-align: center; font-size: 0.95rem; }
+
         .stat {
             font-size: 0.85rem;
             color: var(--text-muted);
@@ -187,8 +216,8 @@
     <div class="tip">Left-click to Rotate | Right-click to Pan | Scroll to Zoom</div>
 
     <div class="ui-panel">
-        <h1>Quantum Wave Collapse</h1>
-        <p class="desc">Watch a 3D probability wave expand outward. The moment the wave touches the Dyson Sphere detector, it instantly collapses into a localized particle.</p>
+        <h1>The Cosmic Lottery</h1>
+        <p class="desc">Watch a 3D probability wave expand outward. Will it collapse early on the intermediate planet (15% chance), or pass through entirely as a wave?</p>
 
         <div class="control-group">
             <button id="btn-fire" class="btn">Fire Single Photon (Spacebar)</button>
@@ -211,10 +240,27 @@
             <div class="stat">Light-Travel Time: <strong style="color: var(--accent);">8.3 Minutes</strong></div>
         </div>
 
-        <div class="stats-box">
-            <div class="stat">Hits: <strong id="val-hits">0</strong></div>
-            <button id="btn-reset" class="reset-btn">Reset Sphere</button>
+        <div class="stats-box" style="flex-wrap: wrap; gap: 10px;">
+            <div class="stat">Planet Hits: <strong id="val-planet-hits" style="color: #ef4444;">0</strong></div>
+            <div class="stat">Sphere Hits: <strong id="val-sphere-hits" style="color: #3b82f6;">0</strong></div>
+            <button id="btn-reset" class="reset-btn" style="width: 100%; margin-top: 5px; text-align: right;">Reset Environment</button>
         </div>
+    </div>
+
+    <!-- Cosmic Lottery Panel -->
+    <div class="lottery-panel">
+        <h3>Cosmic Lottery Detector</h3>
+        <p style="margin-bottom: 8px;">Intermediate Planet at 0.5 AU.</p>
+        <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: bold; margin-bottom: 5px;">
+            <span style="color: #ef4444;">15% Hit</span>
+            <span style="color: #3b82f6;">85% Pass</span>
+        </div>
+        <div class="bar-container">
+            <div class="bar-hit" style="width: 15%"></div>
+            <div class="bar-pass" style="width: 85%"></div>
+            <div id="roll-marker" class="marker"></div>
+        </div>
+        <div id="lottery-result" class="result">Awaiting wave...</div>
     </div>
 
     <script type="module">
@@ -229,7 +275,9 @@
             lambda: 500,
             rate: 10,
             isStreaming: false,
-            hits: 0,
+            totalHits: 0,
+            sphereHits: 0,
+            planetHits: 0,
             colorHex: 0x00ffff
         };
 
@@ -307,6 +355,16 @@
         const shell = new THREE.Mesh(shellGeo, shellMat);
         scene.add(shell);
 
+        // 3. Intermediate Planet (The Cosmic Lottery Detector)
+        const PLANET_DIST = 50;
+        const PLANET_RADIUS = 5;
+        const planetGeo = new THREE.SphereGeometry(PLANET_RADIUS, 32, 32);
+        const planetMat = new THREE.MeshBasicMaterial({ color: 0x8b5cf6 }); // purple
+        const planet = new THREE.Mesh(planetGeo, planetMat);
+        planet.position.set(PLANET_DIST, 0, 0);
+        // We add planet to the rotating shell so it orbits!
+        shell.add(planet);
+
         // --- Quantum Objects ---
         
         // A. Particles (Hits on the shell)
@@ -346,8 +404,8 @@
         waveMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
         scene.add(waveMesh);
 
-        // Tracking array for logical wave radii
-        let activeWaves = []; // array of current radii
+        // Tracking array for logical wave radii and collision state
+        let activeWaves = []; // array of { r: radius, checked: false }
 
         // C. Flashes (Visual burst on impact)
         const flashGeo = new THREE.SphereGeometry(0.8, 16, 16);
@@ -375,7 +433,7 @@
         const dummyColor = new THREE.Color();
 
         function addHit() {
-            if (state.hits >= MAX_HITS) return; // Cap
+            if (state.totalHits >= MAX_HITS) return; // Cap
 
             // Calculate random point on a sphere surface (completely uniform)
             const theta = Math.random() * 2 * Math.PI;
@@ -385,7 +443,7 @@
             const z = SPHERE_RADIUS * Math.cos(phi);
 
             // Update buffer geometry
-            const idx = state.hits * 3;
+            const idx = state.totalHits * 3;
             positions[idx] = x;
             positions[idx+1] = y;
             positions[idx+2] = z;
@@ -395,29 +453,33 @@
             colors[idx+1] = dummyColor.g;
             colors[idx+2] = dummyColor.b;
 
-            state.hits++;
-            hitsGeo.setDrawRange(0, state.hits);
+            state.totalHits++;
+            state.sphereHits++;
+            hitsGeo.setDrawRange(0, state.totalHits);
             hitsGeo.attributes.position.needsUpdate = true;
             hitsGeo.attributes.color.needsUpdate = true;
 
             // Spawn the visual flash!
             spawnFlash(x, y, z, state.colorHex);
 
-            document.getElementById('val-hits').textContent = state.hits.toLocaleString();
+            document.getElementById('val-sphere-hits').textContent = state.sphereHits.toLocaleString();
         }
 
         function firePhoton() {
             if (activeWaves.length < MAX_WAVES) {
                 // Add a new wave starting at radius 2 (edge of star)
-                activeWaves.push(2); 
+                activeWaves.push({ r: 2, checked: false }); 
             }
         }
 
         function resetSphere() {
-            state.hits = 0;
+            state.totalHits = 0;
+            state.sphereHits = 0;
+            state.planetHits = 0;
             hitsGeo.setDrawRange(0, 0);
             activeWaves = [];
-            document.getElementById('val-hits').textContent = '0';
+            document.getElementById('val-sphere-hits').textContent = '0';
+            document.getElementById('val-planet-hits').textContent = '0';
         }
 
         function updateColors() {
@@ -450,18 +512,71 @@
 
             // Update Waves & Handle Collapses
             let waveCount = 0;
-            for (let i = activeWaves.length - 1; i >= 0; i--) {
-                activeWaves[i] += C_SPEED; // Wave expands
+            const HIT_CHANCE = 0.15;
+            const marker = document.getElementById('roll-marker');
+            const resultText = document.getElementById('lottery-result');
 
-                if (activeWaves[i] >= SPHERE_RADIUS) {
-                    // WAVE COLLAPSE! 
-                    // 1. Remove wave
+            for (let i = activeWaves.length - 1; i >= 0; i--) {
+                let w = activeWaves[i];
+                w.r += C_SPEED; // Wave expands
+
+                // Cosmic Lottery Check (0.5 AU)
+                if (!w.checked && w.r >= PLANET_DIST) {
+                    w.checked = true;
+                    const roll = Math.random();
+                    
+                    // UI Update
+                    marker.style.opacity = 1;
+                    marker.style.left = (roll * 100) + '%';
+
+                    if (roll < HIT_CHANCE) {
+                        // COLLAPSE ON PLANET!
+                        resultText.textContent = `Roll: ${(roll*100).toFixed(1)}% — COLLAPSE!`;
+                        resultText.style.color = '#ef4444'; // Red
+                        
+                        // Flash exactly on the star-facing surface of the planet
+                        spawnFlash(PLANET_DIST - PLANET_RADIUS, 0, 0, state.colorHex);
+                        
+                        // Leave a persistent particle mark on the planet's surface
+                        if (state.totalHits < MAX_HITS) {
+                            // Add slight jitter so the dots don't overlap perfectly
+                            const jitterY = (Math.random() - 0.5) * PLANET_RADIUS * 1.5;
+                            const jitterZ = (Math.random() - 0.5) * PLANET_RADIUS * 1.5;
+                            const idx = state.totalHits * 3;
+                            positions[idx] = PLANET_DIST - PLANET_RADIUS;
+                            positions[idx+1] = jitterY;
+                            positions[idx+2] = jitterZ;
+                            
+                            dummyColor.setHex(state.colorHex);
+                            colors[idx] = dummyColor.r;
+                            colors[idx+1] = dummyColor.g;
+                            colors[idx+2] = dummyColor.b;
+                            
+                            state.totalHits++;
+                            state.planetHits++;
+                            hitsGeo.setDrawRange(0, state.totalHits);
+                            hitsGeo.attributes.position.needsUpdate = true;
+                            hitsGeo.attributes.color.needsUpdate = true;
+                            document.getElementById('val-planet-hits').textContent = state.planetHits.toLocaleString();
+                        }
+                        
+                        // Remove wave (photon died early)
+                        activeWaves.splice(i, 1);
+                        continue;
+                    } else {
+                        // PASS
+                        resultText.textContent = `Roll: ${(roll*100).toFixed(1)}% — PASSED`;
+                        resultText.style.color = '#3b82f6'; // Blue
+                    }
+                }
+
+                if (w.r >= SPHERE_RADIUS) {
+                    // WAVE COLLAPSE ON DYSON SPHERE
                     activeWaves.splice(i, 1);
-                    // 2. Spawn localized particle hit
                     addHit();
                 } else {
                     // Update InstancedMesh transform for drawing
-                    dummyMatrix.makeScale(activeWaves[i], activeWaves[i], activeWaves[i]);
+                    dummyMatrix.makeScale(w.r, w.r, w.r);
                     waveMesh.setMatrixAt(waveCount, dummyMatrix);
                     waveCount++;
                 }

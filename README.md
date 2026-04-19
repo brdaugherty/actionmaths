@@ -3,6 +3,8 @@ Maths in action
 
 Concepts and theory, visualized. Simply, act to know.
 
+📖 **[Read the Physics Details & Theory Guide](DETAILS.md)** for a deep dive into the quantum mechanics and theoretical math powering these simulations.
+
 #### Galton Board Simulator
 **👉 [Play the Live Demo here!](https://brdaugherty.github.io/actionmaths/src/galton/)**
 
@@ -44,3 +46,15 @@ Built entirely in the browser using Three.js, it natively handles complex 3D ren
 * Use **Left-Click to Rotate**, **Right-Click to Pan**, and **Scroll to Zoom** to explore the 3D space.
 * Hit **Spacebar** to fire expanding probability waves from the central star.
 * Watch the moment of detection trigger a brilliant, expanding flash on the wireframe shell.
+
+#### The Cosmic Lottery (Probability) Simulator
+**👉 [Play the Live Demo here!](https://brdaugherty.github.io/actionmaths/src/cosmiclottery/)**
+
+A conceptual expansion of the Dyson Sphere simulator that visually answers the question: *What happens when a probability wave hits an object but doesn't collapse?*
+
+This simulator places an intermediate planet halfway between the star and the Dyson Sphere. As the probability wave sweeps over the planet, the physics engine rolls a 100-sided die based on the planet's surface area. 
+* **If it hits (15% chance):** The massive wave instantly collapses and flashes entirely onto the planet.
+* **If it misses (85% chance):** The wave completely ignores the planet and passes through unharmed, collapsing "elsewhere" on the outer Dyson shell.
+
+* **To run locally:** Download the [source file](src/cosmiclottery/index.html?raw=true), usually right click and "save link as".
+* Drag-and-drop the downloaded file into a new tab in your browser.
