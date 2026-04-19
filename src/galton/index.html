@@ -26,11 +26,18 @@
 
         .bucket-counter {
             transition: background-color 0.3s ease, transform 0.2s ease;
+            transform-origin: bottom center;
         }
 
+        /* Heatmap Colors */
+        .bucket-counter.heatmap-red { background-color: #e53e3e; }
+        .bucket-counter.heatmap-yellow { background-color: #d69e2e; }
+        .bucket-counter.heatmap-green { background-color: #38a169; }
+
         .bucket-counter.highlight {
-            background-color: #4299e1; /* blue-400 */
+            background-color: #4299e1 !important; /* blue-400 */
             transform: scale(1.1);
+            z-index: 10;
         }
     </style>
 </head>
@@ -44,12 +51,12 @@
     </div>
 
     <!-- Game Container wrapper for proper scaling -->
-    <div id="game-container" style="transform-origin: top center; width: 800px;">
+    <div id="game-container" style="position: relative; transform-origin: top center; width: 800px; height: 750px;">
         <!-- Canvas for the Galton Board animation -->
-        <canvas id="galtonBoard" style="width: 800px; height: 750px;"></canvas>
+        <canvas id="galtonBoard" style="width: 800px; height: 750px; display: block;"></canvas>
 
-        <!-- Container for the bucket counters -->
-        <div id="bucketCounters" class="flex justify-center items-end mt-4 space-x-1 w-full mx-auto" style="width: 800px;"></div>
+        <!-- Container for the bucket counters overlaying the canvas -->
+        <div id="bucketCounters" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></div>
     </div>
 
     <script>
@@ -83,10 +90,19 @@
         let buckets = [];
         let balls = [];
         let bucketCounts = new Array(DEPTH + 1).fill(0);
+        let bucketProbabilities = new Array(DEPTH + 1).fill(0);
         let bucketFreqHz = new Array(DEPTH + 1).fill(440); // 440 Hz (A4)
         let totalBallsDropped = 0; // Counter for total balls
 
         // --- Utility Functions ---
+        function getBinomialProbability(n, k) {
+            let coeff = 1;
+            for (let i = 1; i <= k; i++) {
+                coeff = coeff * (n - i + 1) / i;
+            }
+            return coeff * Math.pow(0.5, n);
+        }
+
         /**
          * Draws a circle on the canvas.
          * @param {number} x - The x-coordinate of the circle's center.
@@ -107,6 +123,11 @@
          */
         function setupBoard() {
             pegs = [];
+            
+            // Calculate binomial probabilities for the ideal distribution
+            for (let i = 0; i <= DEPTH; i++) {
+                bucketProbabilities[i] = getBinomialProbability(DEPTH, i);
+            }
             const topOffset = 80; // Starting Y position for the first peg
 
             // Calculate peg positions (Pascal's Triangle layout)
@@ -142,16 +163,22 @@
         }
 
         /**
-         * Creates and initializes the counter display elements below the canvas.
+         * Creates and initializes the counter display elements over the canvas.
          */
         function setupBucketCounters() {
             const countersContainer = document.getElementById('bucketCounters');
             countersContainer.innerHTML = ''; // Clear existing counters
             bucketCounts.forEach((count, index) => {
                 const counterDiv = document.createElement('div');
-                counterDiv.className = 'bucket-counter bg-gray-700 text-white font-bold py-2 rounded-t-lg text-center';
-                counterDiv.style.width = `${HORIZONTAL_SPACING * 0.8}px`;
-                counterDiv.style.minHeight = '40px';
+                // Absolute positioned over the canvas bucket coordinates
+                counterDiv.className = 'bucket-counter bg-gray-700 text-white font-bold rounded-t-lg absolute flex items-center justify-center text-sm';
+                
+                const bucket = buckets[index];
+                counterDiv.style.width = `${bucket.width}px`;
+                counterDiv.style.height = `${bucket.height}px`;
+                counterDiv.style.left = `${bucket.x - bucket.width / 2}px`;
+                counterDiv.style.top = `${bucket.y}px`;
+                
                 counterDiv.id = `bucket-${index}`;
                 counterDiv.textContent = count;
                 countersContainer.appendChild(counterDiv);
@@ -162,6 +189,54 @@
          * Draws the entire board: pegs and buckets.
          */
         function drawBoard() {
+            // Draw statistical chart overlay
+            if (totalBallsDropped > 0) {
+                const maxExpected = Math.max(...bucketProbabilities) * totalBallsDropped;
+                const maxActual = Math.max(...bucketCounts);
+                const maxScaleValue = Math.max(maxExpected, maxActual, 1);
+                const maxBarHeight = 300; // Max height for the overlay bars
+
+                // Draw actual result bars
+                ctx.fillStyle = 'rgba(66, 153, 225, 0.5)'; // Semi-transparent blue
+                buckets.forEach((bucket, i) => {
+                    const barHeight = (bucketCounts[i] / maxScaleValue) * maxBarHeight;
+                    // Draw upwards from the top of the bucket
+                    ctx.fillRect(bucket.x - bucket.width / 2, bucket.y - barHeight, bucket.width, barHeight);
+                });
+
+                // Draw expected ghost curve (smoothed)
+                ctx.beginPath();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'; // Glowing white curve
+                ctx.lineWidth = 3;
+                
+                const points = buckets.map((bucket, i) => {
+                    const expectedCount = bucketProbabilities[i] * totalBallsDropped;
+                    return {
+                        x: bucket.x,
+                        y: bucket.y - (expectedCount / maxScaleValue) * maxBarHeight
+                    };
+                });
+
+                if (points.length > 0) {
+                    ctx.moveTo(points[0].x, points[0].y);
+                    for (let i = 0; i < points.length - 1; i++) {
+                        const p0 = i > 0 ? points[i - 1] : points[0];
+                        const p1 = points[i];
+                        const p2 = points[i + 1];
+                        const p3 = i !== points.length - 2 ? points[i + 2] : p2;
+
+                        const cp1x = p1.x + (p2.x - p0.x) / 6;
+                        const cp1y = p1.y + (p2.y - p0.y) / 6;
+
+                        const cp2x = p2.x - (p3.x - p1.x) / 6;
+                        const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+                        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+                    }
+                }
+                ctx.stroke();
+            }
+
             // Draw pegs
             ctx.fillStyle = '#90cdf4'; // light-blue-300
             pegs.forEach(row => {
@@ -170,11 +245,8 @@
                 });
             });
 
-            // Draw buckets
-            ctx.fillStyle = '#4a5568'; // gray-600
-            buckets.forEach(bucket => {
-                ctx.fillRect(bucket.x - bucket.width / 2, bucket.y, bucket.width, bucket.height);
-            });
+            // The buckets are now HTML elements overlaid on the canvas,
+            // so we no longer need to draw the gray rectangles here!
         }
 
         /**
@@ -192,7 +264,7 @@
                 row: 0,
                 col: 0,
                 startTime: Date.now(),
-                color: `hsl(${Math.random() * 360}, 70%, 60%)`
+                color: '#e2e8f0' // Silver color (tailwind gray-200)
             };
             balls.push(newBall);
         }
@@ -251,6 +323,7 @@
                             totalBallsDropped++;
                             updateCounter(finalCol);
                             document.getElementById('totalCounter').textContent = totalBallsDropped;
+                            updateHeatmap();
 
                             playTone(finalCol);
                         }
@@ -302,10 +375,50 @@
             if (counterEl) {
                 counterEl.textContent = bucketCounts[index];
                 counterEl.classList.add('highlight');
+                
+                // Clear existing timeout to prevent jittering during rapid ball drops
+                if (counterEl.dataset.timeoutId) {
+                    clearTimeout(Number(counterEl.dataset.timeoutId));
+                }
+                
                 // Remove the highlight after a short delay to create a flash effect
-                setTimeout(() => {
+                const timeoutId = setTimeout(() => {
                     counterEl.classList.remove('highlight');
-                }, 300);
+                }, 150); // Faster snap back
+                
+                counterEl.dataset.timeoutId = timeoutId;
+            }
+        }
+
+        /**
+         * Updates the heatmap colors of all buckets based on Z-score.
+         */
+        function updateHeatmap() {
+            if (totalBallsDropped < 10) return; // Need a minimum sample size
+            
+            for (let i = 0; i <= DEPTH; i++) {
+                const actual = bucketCounts[i];
+                const p = bucketProbabilities[i];
+                const expected = p * totalBallsDropped;
+                const variance = totalBallsDropped * p * (1 - p);
+                const sigma = Math.sqrt(variance);
+                
+                let zScore = 0;
+                if (sigma > 0) {
+                    zScore = Math.abs(actual - expected) / sigma;
+                }
+                
+                const counterEl = document.getElementById(`bucket-${i}`);
+                if (counterEl) {
+                    counterEl.classList.remove('heatmap-red', 'heatmap-yellow', 'heatmap-green');
+                    if (zScore < 1) {
+                        counterEl.classList.add('heatmap-green');
+                    } else if (zScore < 2) {
+                        counterEl.classList.add('heatmap-yellow');
+                    } else {
+                        counterEl.classList.add('heatmap-red');
+                    }
+                }
             }
         }
 
@@ -356,7 +469,8 @@
             const availableWidth = Math.min(window.innerWidth, document.documentElement.clientWidth) - paddingX;
             const availableHeight = window.innerHeight - headerHeight - paddingY;
             
-            const originalHeight = gameContainer.offsetHeight || (CANVAS_HEIGHT + 70);
+            // Since buckets are overlaid, container height is exactly canvas height
+            const originalHeight = CANVAS_HEIGHT;
             
             // Calculate scale constraints for both width and height to ensure it fits entirely on screen
             const scaleWidth = availableWidth / CANVAS_WIDTH;
