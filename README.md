@@ -3,6 +3,8 @@ Maths in action
 
 Concepts and theory, visualized. Simply, act to know.
 
+📖 **[Read the Physics Details & Theory Guide](DETAILS.md)** for a deep dive into the quantum mechanics and theoretical math powering these simulations.
+
 #### Galton Board Simulator
 **👉 [Play the Live Demo here!](https://brdaugherty.github.io/actionmaths/src/galton/)**
 

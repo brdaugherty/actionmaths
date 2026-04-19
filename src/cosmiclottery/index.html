@@ -240,19 +240,24 @@
             <div class="stat">Light-Travel Time: <strong style="color: var(--accent);">8.3 Minutes</strong></div>
         </div>
 
-        <div class="stats-box">
-            <div class="stat">Hits: <strong id="val-hits">0</strong></div>
-            <button id="btn-reset" class="reset-btn">Reset Sphere</button>
+        <div class="stats-box" style="flex-wrap: wrap; gap: 10px;">
+            <div class="stat">Planet Hits: <strong id="val-planet-hits" style="color: #ef4444;">0</strong></div>
+            <div class="stat">Sphere Hits: <strong id="val-sphere-hits" style="color: #3b82f6;">0</strong></div>
+            <button id="btn-reset" class="reset-btn" style="width: 100%; margin-top: 5px; text-align: right;">Reset Environment</button>
         </div>
     </div>
 
     <!-- Cosmic Lottery Panel -->
     <div class="lottery-panel">
         <h3>Cosmic Lottery Detector</h3>
-        <p>Intermediate Planet at 0.5 AU.</p>
+        <p style="margin-bottom: 8px;">Intermediate Planet at 0.5 AU.</p>
+        <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: bold; margin-bottom: 5px;">
+            <span style="color: #ef4444;">15% Hit</span>
+            <span style="color: #3b82f6;">85% Pass</span>
+        </div>
         <div class="bar-container">
-            <div class="bar-hit" style="width: 15%">15% HIT</div>
-            <div class="bar-pass" style="width: 85%">85% PASS</div>
+            <div class="bar-hit" style="width: 15%"></div>
+            <div class="bar-pass" style="width: 85%"></div>
             <div id="roll-marker" class="marker"></div>
         </div>
         <div id="lottery-result" class="result">Awaiting wave...</div>
@@ -270,7 +275,9 @@
             lambda: 500,
             rate: 10,
             isStreaming: false,
-            hits: 0,
+            totalHits: 0,
+            sphereHits: 0,
+            planetHits: 0,
             colorHex: 0x00ffff
         };
 
@@ -426,7 +433,7 @@
         const dummyColor = new THREE.Color();
 
         function addHit() {
-            if (state.hits >= MAX_HITS) return; // Cap
+            if (state.totalHits >= MAX_HITS) return; // Cap
 
             // Calculate random point on a sphere surface (completely uniform)
             const theta = Math.random() * 2 * Math.PI;
@@ -436,7 +443,7 @@
             const z = SPHERE_RADIUS * Math.cos(phi);
 
             // Update buffer geometry
-            const idx = state.hits * 3;
+            const idx = state.totalHits * 3;
             positions[idx] = x;
             positions[idx+1] = y;
             positions[idx+2] = z;
@@ -446,15 +453,16 @@
             colors[idx+1] = dummyColor.g;
             colors[idx+2] = dummyColor.b;
 
-            state.hits++;
-            hitsGeo.setDrawRange(0, state.hits);
+            state.totalHits++;
+            state.sphereHits++;
+            hitsGeo.setDrawRange(0, state.totalHits);
             hitsGeo.attributes.position.needsUpdate = true;
             hitsGeo.attributes.color.needsUpdate = true;
 
             // Spawn the visual flash!
             spawnFlash(x, y, z, state.colorHex);
 
-            document.getElementById('val-hits').textContent = state.hits.toLocaleString();
+            document.getElementById('val-sphere-hits').textContent = state.sphereHits.toLocaleString();
         }
 
         function firePhoton() {
@@ -465,10 +473,13 @@
         }
 
         function resetSphere() {
-            state.hits = 0;
+            state.totalHits = 0;
+            state.sphereHits = 0;
+            state.planetHits = 0;
             hitsGeo.setDrawRange(0, 0);
             activeWaves = [];
-            document.getElementById('val-hits').textContent = '0';
+            document.getElementById('val-sphere-hits').textContent = '0';
+            document.getElementById('val-planet-hits').textContent = '0';
         }
 
         function updateColors() {
@@ -526,10 +537,31 @@
                         // Flash exactly on the star-facing surface of the planet
                         spawnFlash(PLANET_DIST - PLANET_RADIUS, 0, 0, state.colorHex);
                         
+                        // Leave a persistent particle mark on the planet's surface
+                        if (state.totalHits < MAX_HITS) {
+                            // Add slight jitter so the dots don't overlap perfectly
+                            const jitterY = (Math.random() - 0.5) * PLANET_RADIUS * 1.5;
+                            const jitterZ = (Math.random() - 0.5) * PLANET_RADIUS * 1.5;
+                            const idx = state.totalHits * 3;
+                            positions[idx] = PLANET_DIST - PLANET_RADIUS;
+                            positions[idx+1] = jitterY;
+                            positions[idx+2] = jitterZ;
+                            
+                            dummyColor.setHex(state.colorHex);
+                            colors[idx] = dummyColor.r;
+                            colors[idx+1] = dummyColor.g;
+                            colors[idx+2] = dummyColor.b;
+                            
+                            state.totalHits++;
+                            state.planetHits++;
+                            hitsGeo.setDrawRange(0, state.totalHits);
+                            hitsGeo.attributes.position.needsUpdate = true;
+                            hitsGeo.attributes.color.needsUpdate = true;
+                            document.getElementById('val-planet-hits').textContent = state.planetHits.toLocaleString();
+                        }
+                        
                         // Remove wave (photon died early)
                         activeWaves.splice(i, 1);
-                        state.hits++;
-                        document.getElementById('val-hits').textContent = state.hits.toLocaleString();
                         continue;
                     } else {
                         // PASS
