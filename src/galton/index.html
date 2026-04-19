@@ -15,7 +15,7 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            overflow: hidden; /* Prevents scrollbars from appearing during animation */
+            overflow-x: hidden; /* Prevents horizontal scrollbars */
         }
 
         canvas {
@@ -39,20 +39,35 @@
 
     <div class="w-full max-w-4xl mx-auto text-center">
         <h1 class="text-3xl md:text-4xl font-bold text-blue-400 mb-2">Galton Board Simulator</h1>
-        <p class="text-lg text-gray-400 mb-2">Press the <kbd class="px-2 py-1.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg">Spacebar</kbd> to drop a ball.</p>
+        <p class="text-lg text-gray-400 mb-2">Press the <kbd class="px-2 py-1.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg">Spacebar</kbd> or tap the board to drop a ball.</p>
         <p class="text-lg text-gray-300 mb-6">Total Balls In Buckets: <span id="totalCounter" class="font-bold text-blue-300">0</span></p>
     </div>
 
-    <!-- Canvas for the Galton Board animation -->
-    <canvas id="galtonBoard" width="800" height="750"></canvas>
+    <!-- Game Container wrapper for proper scaling -->
+    <div id="game-container" style="transform-origin: top center; width: 800px;">
+        <!-- Canvas for the Galton Board animation -->
+        <canvas id="galtonBoard" style="width: 800px; height: 750px;"></canvas>
 
-    <!-- Container for the bucket counters -->
-    <div id="bucketCounters" class="flex justify-center items-end mt-4 space-x-1 w-full max-w-4xl mx-auto"></div>
+        <!-- Container for the bucket counters -->
+        <div id="bucketCounters" class="flex justify-center items-end mt-4 space-x-1 w-full mx-auto" style="width: 800px;"></div>
+    </div>
 
     <script>
         // --- Canvas and Context Setup ---
         const canvas = document.getElementById('galtonBoard');
         const ctx = canvas.getContext('2d');
+        const gameContainer = document.getElementById('game-container');
+        
+        // Logical canvas size
+        const CANVAS_WIDTH = 800;
+        const CANVAS_HEIGHT = 750;
+
+        function setupCanvasForHighDPI() {
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = CANVAS_WIDTH * dpr;
+            canvas.height = CANVAS_HEIGHT * dpr;
+            ctx.scale(dpr, dpr);
+        }
 
         // --- Configuration ---
         const DEPTH = 10; // Number of peg rows
@@ -98,7 +113,7 @@
             for (let row = 0; row < DEPTH; row++) {
                 const rowPegs = [];
                 const rowWidth = row * HORIZONTAL_SPACING;
-                const startX = (canvas.width - rowWidth) / 2;
+                const startX = (CANVAS_WIDTH - rowWidth) / 2;
                 for (let col = 0; col <= row; col++) {
                     const x = startX + col * HORIZONTAL_SPACING;
                     const y = topOffset + row * VERTICAL_SPACING;
@@ -114,7 +129,7 @@
             buckets = [];
             const bucketRowY = topOffset + DEPTH * VERTICAL_SPACING + 20;
             const bucketRowWidth = DEPTH * HORIZONTAL_SPACING;
-            const startBucketX = (canvas.width - bucketRowWidth) / 2;
+            const startBucketX = (CANVAS_WIDTH - bucketRowWidth) / 2;
             for (let i = 0; i <= DEPTH; i++) {
                 buckets.push({
                     x: startBucketX + i * HORIZONTAL_SPACING,
@@ -298,7 +313,7 @@
          * The main animation loop.
          */
         function animate() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
+            ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT); // Clear canvas
             drawBoard();
             updateBalls();
             // Draw balls after updating their positions
@@ -309,21 +324,49 @@
         }
 
         // --- Event Listeners ---
+        function handleInteraction() {
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            releaseBall();
+        }
+
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Space') {
                 e.preventDefault(); // Prevent default spacebar action (e.g., scrolling)
-                releaseBall();
+                handleInteraction();
             }
+        });
+
+        // Add pointerdown to the game container for mobile tap support
+        gameContainer.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            handleInteraction();
         });
 
         // Handle window resizing
         function onResize() {
-            const container = canvas.parentElement;
-            const randoWidthMax = 620; // Just a guess
-            const size = Math.min(container.clientWidth, randoWidthMax);
-
-            canvas.style.width = `${size}px`;
-            canvas.style.height = `${size * (750/800)}px`;
+            // Find the header to subtract its height from available screen space
+            const header = document.querySelector('.max-w-4xl.text-center');
+            const headerHeight = header ? header.offsetHeight : 150;
+            
+            const paddingX = 32; // 16px padding on each side
+            const paddingY = 32; // 16px padding top and bottom from body p-4
+            
+            const availableWidth = Math.min(window.innerWidth, document.documentElement.clientWidth) - paddingX;
+            const availableHeight = window.innerHeight - headerHeight - paddingY;
+            
+            const originalHeight = gameContainer.offsetHeight || (CANVAS_HEIGHT + 70);
+            
+            // Calculate scale constraints for both width and height to ensure it fits entirely on screen
+            const scaleWidth = availableWidth / CANVAS_WIDTH;
+            const scaleHeight = availableHeight / originalHeight;
+            const scale = Math.max(0.1, Math.min(scaleWidth, scaleHeight, 1));
+            
+            gameContainer.style.transform = `scale(${scale})`;
+            
+            // Adjust margin bottom so the scaled down container doesn't leave huge empty space
+            gameContainer.style.marginBottom = `${(originalHeight * scale) - originalHeight}px`;
         }
         window.addEventListener('resize', onResize);
 
@@ -339,8 +382,11 @@
         }
 
         // --- Initialization ---
+        setupCanvasForHighDPI();
         setupBoard();
         onResize();
+        // Call onResize again after layout has settled to ensure correct originalHeight
+        setTimeout(onResize, 0);
         animate();
     </script>
 </body>
