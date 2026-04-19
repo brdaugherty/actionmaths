@@ -32,3 +32,15 @@ This interactive simulation visualizes the intense math behind wave interference
 * Click **Toggle Continuous Stream** to watch the classical interference pattern organically build up over time.
 * Click **Toggle Wave View** to visualize the invisible, overlapping ripples causing the pattern.
 * Adjust the **Wavelength ($\lambda$)** and **Slit Separation ($d$)** sliders to instantly see the math update the live probability distribution graph!
+
+#### Quantum Wave Collapse (Dyson Sphere) Simulator
+**👉 [Play the Live Demo here!](https://brdaugherty.github.io/actionmaths/src/dysonsphere/)**
+
+This immersive 3D simulation explores the exact moment of wavefunction collapse. By scaling the thought experiment up to astronomical proportions (1 AU), it visualizes how a 3-dimensional probability wave propagates outwardly from a star before instantly collapsing into a single, localized particle upon interacting with a massive detector shell.
+
+Built entirely in the browser using Three.js, it natively handles complex 3D rendering and particle math.
+* **To run locally:** Download the [source file](src/dysonsphere/index.html?raw=true), usually right click and "save link as".
+* Drag-and-drop the downloaded file into a new tab in your browser.
+* Use **Left-Click to Rotate**, **Right-Click to Pan**, and **Scroll to Zoom** to explore the 3D space.
+* Hit **Spacebar** to fire expanding probability waves from the central star.
+* Watch the moment of detection trigger a brilliant, expanding flash on the wireframe shell.

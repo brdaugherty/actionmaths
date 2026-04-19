@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Wave Collapse - Dyson Sphere</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #050505;
+            --panel-bg: rgba(15, 23, 42, 0.85); /* slate-900 */
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-hover: #0ea5e9;
+            --border: #334155;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: 'Inter', sans-serif;
+            color: var(--text-main);
+        }
+
+        #webgl-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        .ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background: var(--panel-bg);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            width: 340px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            pointer-events: auto;
+        }
+
+        h1 {
+            margin: 0 0 8px 0;
+            font-size: 1.2rem;
+            color: var(--accent);
+        }
+
+        p.desc {
+            margin: 0 0 20px 0;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background-color: var(--accent);
+            color: #000;
+            border: none;
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .btn.active {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        .slider-box {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .slider-box label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            margin-top: -6px;
+        }
+
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--border);
+            border-radius: 2px;
+        }
+
+        .stats-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stat {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .stat strong {
+            color: #fff;
+            font-size: 1rem;
+        }
+        
+        .reset-btn {
+            background: none;
+            border: none;
+            color: var(--accent);
+            cursor: pointer;
+            font-size: 0.85rem;
+            padding: 0;
+        }
+        .reset-btn:hover {
+            text-decoration: underline;
+        }
+        
+        .tip {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            color: rgba(255,255,255,0.5);
+            font-size: 0.8rem;
+            pointer-events: none;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+    </style>
+
+    <!-- Import Map for Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="webgl-container"></div>
+    <div class="tip">Left-click to Rotate | Right-click to Pan | Scroll to Zoom</div>
+
+    <div class="ui-panel">
+        <h1>Quantum Wave Collapse</h1>
+        <p class="desc">Watch a 3D probability wave expand outward. The moment the wave touches the Dyson Sphere detector, it instantly collapses into a localized particle.</p>
+
+        <div class="control-group">
+            <button id="btn-fire" class="btn">Fire Single Photon (Spacebar)</button>
+            <button id="btn-stream" class="btn">Toggle Continuous Stream</button>
+        </div>
+
+        <div class="control-group">
+            <div class="slider-box">
+                <label><span>Emission Rate</span> <span id="val-rate">10 / sec</span></label>
+                <input type="range" id="slider-rate" min="1" max="100" value="10">
+            </div>
+            <div class="slider-box">
+                <label><span>Wavelength (λ)</span> <span id="val-lambda">500 nm</span></label>
+                <input type="range" id="slider-lambda" min="400" max="700" value="500">
+            </div>
+        </div>
+
+        <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border);">
+            <div class="stat" style="margin-bottom: 4px;">Detector Radius: <strong style="color: var(--accent);">1 AU</strong> <span style="opacity: 0.7; font-size: 0.75rem;">(149.6M km)</span></div>
+            <div class="stat">Light-Travel Time: <strong style="color: var(--accent);">8.3 Minutes</strong></div>
+        </div>
+
+        <div class="stats-box">
+            <div class="stat">Hits: <strong id="val-hits">0</strong></div>
+            <button id="btn-reset" class="reset-btn">Reset Sphere</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- Physics & App State ---
+        const SPHERE_RADIUS = 100;
+        const C_SPEED = 2.5; // Expansion speed of the wave per frame
+        
+        let state = {
+            lambda: 500,
+            rate: 10,
+            isStreaming: false,
+            hits: 0,
+            colorHex: 0x00ffff
+        };
+
+        // --- Color Utility ---
+        function nmToHex(wavelength) {
+            let r, g, b;
+            if (wavelength >= 380 && wavelength < 440) {
+                r = -(wavelength - 440) / (440 - 380); g = 0; b = 1;
+            } else if (wavelength >= 440 && wavelength < 490) {
+                r = 0; g = (wavelength - 440) / (490 - 440); b = 1;
+            } else if (wavelength >= 490 && wavelength < 510) {
+                r = 0; g = 1; b = -(wavelength - 510) / (510 - 490);
+            } else if (wavelength >= 510 && wavelength < 580) {
+                r = (wavelength - 510) / (580 - 510); g = 1; b = 0;
+            } else if (wavelength >= 580 && wavelength < 645) {
+                r = 1; g = -(wavelength - 645) / (645 - 580); b = 0;
+            } else if (wavelength >= 645 && wavelength <= 780) {
+                r = 1; g = 0; b = 0;
+            } else {
+                r = 0; g = 0; b = 0;
+            }
+
+            let factor = 1;
+            if (wavelength >= 380 && wavelength < 420) factor = 0.3 + 0.7*(wavelength - 380) / (420 - 380);
+            else if (wavelength >= 420 && wavelength < 700) factor = 1.0;
+            else if (wavelength >= 700 && wavelength <= 780) factor = 0.3 + 0.7*(780 - wavelength) / (780 - 700);
+
+            r = Math.round(r * factor * 255);
+            g = Math.round(g * factor * 255);
+            b = Math.round(b * factor * 255);
+            return (r << 16) + (g << 8) + b;
+        }
+
+        state.colorHex = nmToHex(state.lambda);
+
+        // --- Three.js Setup ---
+        const container = document.getElementById('webgl-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050505, 0.003);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0, SPHERE_RADIUS * 2.2);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // --- Environment Objects ---
+        // 1. Central Star (Source)
+        const starGeo = new THREE.SphereGeometry(2, 32, 32);
+        const starMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const star = new THREE.Mesh(starGeo, starMat);
+        scene.add(star);
+
+        // A subtle glow around the star
+        const glowGeo = new THREE.SphereGeometry(3, 32, 32);
+        const glowMat = new THREE.MeshBasicMaterial({ color: state.colorHex, transparent: true, opacity: 0.3 });
+        const glow = new THREE.Mesh(glowGeo, glowMat);
+        scene.add(glow);
+
+        // 2. Dyson Sphere (Detector Shell)
+        const shellGeo = new THREE.SphereGeometry(SPHERE_RADIUS, 64, 64);
+        const shellMat = new THREE.MeshBasicMaterial({ 
+            color: 0x334155, 
+            wireframe: true, 
+            transparent: true, 
+            opacity: 0.15,
+            side: THREE.BackSide
+        });
+        const shell = new THREE.Mesh(shellGeo, shellMat);
+        scene.add(shell);
+
+        // --- Quantum Objects ---
+        
+        // A. Particles (Hits on the shell)
+        // We use a BufferGeometry Points object to efficiently render tens of thousands of dots
+        const MAX_HITS = 200000;
+        const hitsGeo = new THREE.BufferGeometry();
+        const positions = new Float32Array(MAX_HITS * 3);
+        const colors = new Float32Array(MAX_HITS * 3);
+        hitsGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        hitsGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        hitsGeo.setDrawRange(0, 0);
+
+        const hitsMat = new THREE.PointsMaterial({
+            size: 2,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.9,
+            blending: THREE.AdditiveBlending
+        });
+        const particleSystem = new THREE.Points(hitsGeo, hitsMat);
+        scene.add(particleSystem);
+
+        // B. Probability Waves (Expanding Bubbles)
+        // Using InstancedMesh for performance so we can have hundreds of simultaneous waves
+        const MAX_WAVES = 500;
+        const waveGeo = new THREE.SphereGeometry(1, 64, 64);
+        const waveMat = new THREE.MeshBasicMaterial({
+            color: state.colorHex,
+            transparent: true,
+            opacity: 0.05,
+            wireframe: false,
+            side: THREE.BackSide,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        const waveMesh = new THREE.InstancedMesh(waveGeo, waveMat, MAX_WAVES);
+        waveMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        scene.add(waveMesh);
+
+        // Tracking array for logical wave radii
+        let activeWaves = []; // array of current radii
+
+        // C. Flashes (Visual burst on impact)
+        const flashGeo = new THREE.SphereGeometry(0.8, 16, 16);
+        let activeFlashes = [];
+
+        function spawnFlash(x, y, z, colorHex) {
+            const mat = new THREE.MeshBasicMaterial({
+                color: colorHex,
+                transparent: true,
+                opacity: 1.0,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const mesh = new THREE.Mesh(flashGeo, mat);
+            mesh.position.set(x, y, z);
+            
+            // Attach to the rotating shell so the flash stays pinned to the surface as it rotates!
+            shell.add(mesh);
+            
+            activeFlashes.push({ mesh, life: 1.0 });
+        }
+
+        // --- Logic ---
+        const dummyMatrix = new THREE.Matrix4();
+        const dummyColor = new THREE.Color();
+
+        function addHit() {
+            if (state.hits >= MAX_HITS) return; // Cap
+
+            // Calculate random point on a sphere surface (completely uniform)
+            const theta = Math.random() * 2 * Math.PI;
+            const phi = Math.acos(2 * Math.random() - 1);
+            const x = SPHERE_RADIUS * Math.sin(phi) * Math.cos(theta);
+            const y = SPHERE_RADIUS * Math.sin(phi) * Math.sin(theta);
+            const z = SPHERE_RADIUS * Math.cos(phi);
+
+            // Update buffer geometry
+            const idx = state.hits * 3;
+            positions[idx] = x;
+            positions[idx+1] = y;
+            positions[idx+2] = z;
+
+            dummyColor.setHex(state.colorHex);
+            colors[idx] = dummyColor.r;
+            colors[idx+1] = dummyColor.g;
+            colors[idx+2] = dummyColor.b;
+
+            state.hits++;
+            hitsGeo.setDrawRange(0, state.hits);
+            hitsGeo.attributes.position.needsUpdate = true;
+            hitsGeo.attributes.color.needsUpdate = true;
+
+            // Spawn the visual flash!
+            spawnFlash(x, y, z, state.colorHex);
+
+            document.getElementById('val-hits').textContent = state.hits.toLocaleString();
+        }
+
+        function firePhoton() {
+            if (activeWaves.length < MAX_WAVES) {
+                // Add a new wave starting at radius 2 (edge of star)
+                activeWaves.push(2); 
+            }
+        }
+
+        function resetSphere() {
+            state.hits = 0;
+            hitsGeo.setDrawRange(0, 0);
+            activeWaves = [];
+            document.getElementById('val-hits').textContent = '0';
+        }
+
+        function updateColors() {
+            state.colorHex = nmToHex(state.lambda);
+            glowMat.color.setHex(state.colorHex);
+            waveMat.color.setHex(state.colorHex);
+            // Notice: we do NOT change the color of existing particles in the buffer. 
+            // This leaves a rainbow history if the user changes the slider while running!
+        }
+
+        // --- Animation Loop ---
+        let lastTime = performance.now();
+        let emissionAccumulator = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const now = performance.now();
+            const dt = (now - lastTime) / 1000; // seconds
+            lastTime = now;
+
+            // Handle Continuous Emission
+            if (state.isStreaming) {
+                emissionAccumulator += state.rate * dt;
+                while (emissionAccumulator >= 1) {
+                    firePhoton();
+                    emissionAccumulator -= 1;
+                }
+            }
+
+            // Update Waves & Handle Collapses
+            let waveCount = 0;
+            for (let i = activeWaves.length - 1; i >= 0; i--) {
+                activeWaves[i] += C_SPEED; // Wave expands
+
+                if (activeWaves[i] >= SPHERE_RADIUS) {
+                    // WAVE COLLAPSE! 
+                    // 1. Remove wave
+                    activeWaves.splice(i, 1);
+                    // 2. Spawn localized particle hit
+                    addHit();
+                } else {
+                    // Update InstancedMesh transform for drawing
+                    dummyMatrix.makeScale(activeWaves[i], activeWaves[i], activeWaves[i]);
+                    waveMesh.setMatrixAt(waveCount, dummyMatrix);
+                    waveCount++;
+                }
+            }
+            
+            // Hide unused instances
+            waveMesh.count = waveCount;
+            if (waveCount > 0) {
+                waveMesh.instanceMatrix.needsUpdate = true;
+            }
+
+            // Update Flashes
+            for (let i = activeFlashes.length - 1; i >= 0; i--) {
+                const flash = activeFlashes[i];
+                flash.life -= dt * 2.5; // Fades out in 0.4 seconds
+                if (flash.life <= 0) {
+                    shell.remove(flash.mesh);
+                    flash.mesh.material.dispose();
+                    activeFlashes.splice(i, 1);
+                } else {
+                    const scale = 1.0 + (1.0 - flash.life) * 8.0; // Grows up to 9x size
+                    flash.mesh.scale.set(scale, scale, scale);
+                    flash.mesh.material.opacity = flash.life;
+                }
+            }
+
+            // Slowly rotate the entire Dyson sphere for cinematic effect
+            shell.rotation.y += 0.001;
+            shell.rotation.z += 0.0005;
+            particleSystem.rotation.copy(shell.rotation);
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // --- UI Interactions ---
+        document.getElementById('btn-fire').addEventListener('click', firePhoton);
+        
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                firePhoton();
+            }
+        });
+
+        document.getElementById('btn-stream').addEventListener('click', (e) => {
+            state.isStreaming = !state.isStreaming;
+            e.target.classList.toggle('active', state.isStreaming);
+            e.target.textContent = state.isStreaming ? 'Stop Stream' : 'Toggle Continuous Stream';
+            emissionAccumulator = 0;
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', resetSphere);
+
+        const sliderRate = document.getElementById('slider-rate');
+        const valRate = document.getElementById('val-rate');
+        sliderRate.addEventListener('input', (e) => {
+            state.rate = parseInt(e.target.value);
+            valRate.textContent = `${state.rate} / sec`;
+        });
+
+        const sliderLambda = document.getElementById('slider-lambda');
+        const valLambda = document.getElementById('val-lambda');
+        sliderLambda.addEventListener('input', (e) => {
+            state.lambda = parseInt(e.target.value);
+            valLambda.textContent = `${state.lambda} nm`;
+            updateColors();
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start
+        animate();
+    </script>
+</body>
+</html>
