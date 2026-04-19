@@ -482,7 +482,7 @@
                     flash.mesh.material.dispose();
                     activeFlashes.splice(i, 1);
                 } else {
-                    const scale = 1.0 + (1.0 - flash.life) * 8.0; // Grows up to 9x size
+                    const scale = 1.0 + (1.0 - flash.life) * 4.0; // Grows up to 5x size
                     flash.mesh.scale.set(scale, scale, scale);
                     flash.mesh.material.opacity = flash.life;
                 }
