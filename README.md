@@ -1,23 +1,21 @@
 # actionmaths
-Maths in action
 
-Concepts and theory, visualized. Simply, act to know.
-
-📖 **[Read the Physics Details & Theory Guide](DETAILS.md)** for a deep dive into the quantum mechanics and theoretical math powering these simulations.
+Maths in action. Browser-native, interactive physics and probability simulations using Three.js and Vanilla JS.
 
 ---
 
-### 🚀 How to Use
-All simulations run directly in your browser using pure HTML/JavaScript.
+### Getting Started
 
-*   **Live Demo:** Click the "Play Live Demo" link under any experiment.
+Explore the simulations below by following these steps:
+
+*   **Play Live:** Click "Play Live Demo" to open the interactive simulation in your browser via GitHub Pages.
 *   **Run Locally:** Right-click "Download Source", save the file, and drag it into a new browser tab.
 *   **Experiment:** Modify the source code in a text editor and refresh your tab to see the math change in real-time.
 
 ---
 
 #### Galton Board Simulator
-**[Play Live Demo](https://brdaugherty.github.io/actionmaths/src/galton/) | [Download Source](src/galton/index.html?raw=true)**
+**[Play Live Demo](https://brdaugherty.github.io/actionmaths/src/galton/) | [Download Source](src/galton/index.html)**
 
 A [Galton board](https://en.wikipedia.org/wiki/Galton_board) shows how a bell curve forms over time from simple random choices for a ball to go left or right. This simulation visualizes the Central Limit Theorem in real-time, featuring a mathematical "ghost curve" overlay and live Z-score heatmap coloring.
 
@@ -25,7 +23,7 @@ A [Galton board](https://en.wikipedia.org/wiki/Galton_board) shows how a bell cu
 *   Turn on your sound for the full experience.
 
 #### Double Slit Experiment Simulator
-**[Play Live Demo](https://brdaugherty.github.io/actionmaths/src/doubleslit/) | [Download Source](src/doubleslit/index.html?raw=true)**
+**[Play Live Demo](https://brdaugherty.github.io/actionmaths/src/doubleslit/) | [Download Source](src/doubleslit/index.html)**
 
 The [Double-slit experiment](https://en.wikipedia.org/wiki/Double-slit_experiment) demonstrates wave-particle duality, showing how probability dictates quantum mechanics.
 
@@ -35,7 +33,7 @@ The [Double-slit experiment](https://en.wikipedia.org/wiki/Double-slit_experimen
 *   Adjust the **Wavelength ($\lambda$)** and **Slit Separation ($d$)** sliders to update the live probability distribution graph.
 
 #### Quantum Wave Collapse (Dyson Sphere) Simulator
-**[Play Live Demo](https://brdaugherty.github.io/actionmaths/src/dysonsphere/) | [Download Source](src/dysonsphere/index.html?raw=true)**
+**[Play Live Demo](https://brdaugherty.github.io/actionmaths/src/dysonsphere/) | [Download Source](src/dysonsphere/index.html)**
 
 This immersive 3D simulation explores the exact moment of wavefunction collapse. It visualizes how a 3D probability wave propagates from a star before collapsing into a single particle upon interacting with a massive detector shell.
 
@@ -44,7 +42,7 @@ This immersive 3D simulation explores the exact moment of wavefunction collapse.
 *   Watch the moment of detection trigger a flash on the wireframe shell.
 
 #### The Cosmic Lottery (Probability) Simulator
-**[Play Live Demo](https://brdaugherty.github.io/actionmaths/src/cosmiclottery/) | [Download Source](src/cosmiclottery/index.html?raw=true)**
+**[Play Live Demo](https://brdaugherty.github.io/actionmaths/src/cosmiclottery/) | [Download Source](src/cosmiclottery/index.html)**
 
 A conceptual expansion of the Dyson Sphere simulator that visually answers: *What happens when a probability wave hits an object but doesn't collapse?*
 
@@ -52,7 +50,7 @@ A conceptual expansion of the Dyson Sphere simulator that visually answers: *Wha
 *   **If it misses (85% chance):** The wave ignores the planet and passes through, collapsing "elsewhere" on the outer Dyson shell.
 
 #### Quantum Field Theory Visualizer
-**[Play Live Demo](https://brdaugherty.github.io/actionmaths/src/qft/) | [Download Source](src/qft/index.html?raw=true)**
+**[Play Live Demo](https://brdaugherty.github.io/actionmaths/src/qft/) | [Download Source](src/qft/index.html)**
 
 This visualization illustrates the relationship between the Zero-Point Field, spherical probability waves, and localized instantiation. It demonstrates that a wave "collapse" is not a particle traveling through space, but rather an instantaneous global state update across the underlying quantum field substrate.
 
@@ -61,7 +59,7 @@ This visualization illustrates the relationship between the Zero-Point Field, sp
 *   Observe the underlying "spacetime grid" deforming only in response to energy excitations, visualizing emergent spacetime.
 
 #### Perspective Journey: Emergent Spacetime
-**[Play Live Demo](https://brdaugherty.github.io/actionmaths/src/journey/) | [Download Source](src/journey/index.html?raw=true)**
+**[Play Live Demo](https://brdaugherty.github.io/actionmaths/src/journey/) | [Download Source](src/journey/index.html)**
 
 An interactive exploration of how space and time arise from a quantum field. Use the slider to smoothly morph reality between three paradigms:
 1. **Classical**: Time ticks forward as objects move through a rigid 2D plane.
