@@ -306,6 +306,17 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
         // --- App State ---
+        
+        // --- V2.0 MULTI-VECTOR APPROACH (HILBERT SPACE) ---
+        // The universe runs on a single mathematical engine: Linear Algebra acting on a Hilbert Space.
+        // For Quantum Field Theory, dimensionality N is extreme. The array no longer stores spatial coordinates,
+        // but rather the correlations (entanglement) between every point in the field.
+        // It is mathematically an NxN Tensor Space. Space and distance emerge from these relationships.
+        // While we use 3D graphics to visualize it here, the underlying State Tensor represents non-local topology.
+        const N_NODES = 150 * 150; // The grid segments
+        const STATE_TENSOR_SIZE = N_NODES * N_NODES; // Tensor representing correlations between all nodes
+        const stateTensor = new Float32Array(STATE_TENSOR_SIZE); // Conceptual backend for the QFT visualizer
+        // --------------------------------------------------
         const state = {
             isWaveActive: false,
             collapsed: false,

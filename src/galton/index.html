@@ -89,7 +89,15 @@
         let pegs = [];
         let buckets = [];
         let balls = [];
-        let bucketCounts = new Array(DEPTH + 1).fill(0);
+        // --- V2.0 MULTI-VECTOR APPROACH (HILBERT SPACE) ---
+        // The universe runs on a single mathematical engine: Linear Algebra acting on a Hilbert Space.
+        // The physics we observe is dictated by the dimensionality (N) of the State Vector.
+        // For the Galton Board (Classical Physics), N is extremely low. We only need enough 
+        // dimensions to track the scalar count/probability for each bucket. Phase/interference cannot exist here.
+        const STATE_VECTOR_SIZE = DEPTH + 1;
+        const stateVector = new Float32Array(STATE_VECTOR_SIZE); 
+        // --------------------------------------------------
+
         let bucketProbabilities = new Array(DEPTH + 1).fill(0);
         let bucketFreqHz = new Array(DEPTH + 1).fill(440); // 440 Hz (A4)
         let totalBallsDropped = 0; // Counter for total balls
@@ -168,7 +176,8 @@
         function setupBucketCounters() {
             const countersContainer = document.getElementById('bucketCounters');
             countersContainer.innerHTML = ''; // Clear existing counters
-            bucketCounts.forEach((count, index) => {
+            for (let index = 0; index < stateVector.length; index++) {
+                const count = stateVector[index];
                 const counterDiv = document.createElement('div');
                 // Absolute positioned over the canvas bucket coordinates
                 counterDiv.className = 'bucket-counter bg-gray-700 text-white font-bold rounded-t-lg absolute flex items-center justify-center text-sm';
@@ -182,7 +191,7 @@
                 counterDiv.id = `bucket-${index}`;
                 counterDiv.textContent = count;
                 countersContainer.appendChild(counterDiv);
-            });
+            }
         }
 
         /**
@@ -192,14 +201,14 @@
             // Draw statistical chart overlay
             if (totalBallsDropped > 0) {
                 const maxExpected = Math.max(...bucketProbabilities) * totalBallsDropped;
-                const maxActual = Math.max(...bucketCounts);
+                const maxActual = Math.max(...stateVector);
                 const maxScaleValue = Math.max(maxExpected, maxActual, 1);
                 const maxBarHeight = 300; // Max height for the overlay bars
 
                 // Draw actual result bars
                 ctx.fillStyle = 'rgba(66, 153, 225, 0.5)'; // Semi-transparent blue
                 buckets.forEach((bucket, i) => {
-                    const barHeight = (bucketCounts[i] / maxScaleValue) * maxBarHeight;
+                    const barHeight = (stateVector[i] / maxScaleValue) * maxBarHeight;
                     // Draw upwards from the top of the bucket
                     ctx.fillRect(bucket.x - bucket.width / 2, bucket.y - barHeight, bucket.width, barHeight);
                 });
@@ -319,7 +328,7 @@
                     if (ball.row === DEPTH) {
                         const finalCol = ball.finalBucketIndex; // Use the stored bucket index
                         if (finalCol !== undefined) {
-                            bucketCounts[finalCol]++;
+                            stateVector[finalCol]++;
                             totalBallsDropped++;
                             updateCounter(finalCol);
                             document.getElementById('totalCounter').textContent = totalBallsDropped;
@@ -373,7 +382,7 @@
         function updateCounter(index) {
             const counterEl = document.getElementById(`bucket-${index}`);
             if (counterEl) {
-                counterEl.textContent = bucketCounts[index];
+                counterEl.textContent = stateVector[index];
                 counterEl.classList.add('highlight');
                 
                 // Clear existing timeout to prevent jittering during rapid ball drops
@@ -397,7 +406,7 @@
             if (totalBallsDropped < 10) return; // Need a minimum sample size
             
             for (let i = 0; i <= DEPTH; i++) {
-                const actual = bucketCounts[i];
+                const actual = stateVector[i];
                 const p = bucketProbabilities[i];
                 const expected = p * totalBallsDropped;
                 const variance = totalBallsDropped * p * (1 - p);

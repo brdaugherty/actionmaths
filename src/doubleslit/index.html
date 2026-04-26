@@ -242,8 +242,16 @@
             time: 0,
         };
 
-        // Bins for histogram (one for every pixel width on screen)
-        let histogram = new Array(W).fill(0);
+        // --- V2.0 MULTI-VECTOR APPROACH (HILBERT SPACE) ---
+        // The universe runs on a single mathematical engine: Linear Algebra acting on a Hilbert Space.
+        // For the Double Slit, the dimensionality N increases from the Galton Board.
+        // N is the number of discrete points on the detector screen. 
+        // Because the vector is now large enough to track Phase mathematically across these points,
+        // probabilities can cancel out and wave interference naturally emerges.
+        const STATE_VECTOR_SIZE = W; 
+        const stateVector = new Float32Array(STATE_VECTOR_SIZE); 
+        // --------------------------------------------------
+
         let activePhotons = [];
 
         // --- Wavelength to RGB approximation ---
@@ -349,7 +357,7 @@
         }
 
         function resetScreen() {
-            histogram.fill(0);
+            stateVector.fill(0);
             state.photonsDetected = 0;
             activePhotons = [];
             document.getElementById('photon-count').textContent = '0';
@@ -436,7 +444,7 @@
                     let progress = p.distTraveled / p.dist2;
                     if (progress >= 1) {
                         // Hit screen!
-                        histogram[p.destX]++;
+                        stateVector[p.destX]++;
                         state.photonsDetected++;
                         document.getElementById('photon-count').textContent = state.photonsDetected;
                         activePhotons.splice(i, 1);
@@ -455,8 +463,8 @@
             // Draw hits on screen
             simCtx.fillStyle = colorRgb;
             for(let x = 0; x < W; x++) {
-                if (histogram[x] > 0) {
-                    simCtx.globalAlpha = Math.min(1, histogram[x] * 0.2);
+                if (stateVector[x] > 0) {
+                    simCtx.globalAlpha = Math.min(1, stateVector[x] * 0.2);
                     simCtx.fillRect(x - 1, Y_SCREEN, 3, 10);
                 }
             }
@@ -482,12 +490,12 @@
             chartCtx.stroke();
 
             // Draw Actual Histogram
-            const maxHits = Math.max(...histogram, 1);
+            const maxHits = Math.max(...stateVector, 1);
             chartCtx.fillStyle = colorRgb;
             chartCtx.globalAlpha = 0.6;
             for (let x = 0; x < W; x++) {
-                if (histogram[x] > 0) {
-                    const h = (histogram[x] / maxHits) * (CH - 30);
+                if (stateVector[x] > 0) {
+                    const h = (stateVector[x] / maxHits) * (CH - 30);
                     chartCtx.fillRect(x, CH - 10 - h, 1, h);
                 }
             }

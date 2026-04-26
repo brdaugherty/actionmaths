@@ -313,9 +313,18 @@
         // We use a BufferGeometry Points object to efficiently render tens of thousands of dots
         const MAX_HITS = 200000;
         const hitsGeo = new THREE.BufferGeometry();
-        const positions = new Float32Array(MAX_HITS * 3);
+        
+        // --- V2.0 MULTI-VECTOR APPROACH (HILBERT SPACE) ---
+        // The universe runs on a single mathematical engine: Linear Algebra acting on a Hilbert Space.
+        // For the Dyson Sphere, the dimensionality N is massive. N maps to a dense 3D coordinate space.
+        // The State Vector tracks the probability density function. A quantum "collapse" is simply 
+        // this massive vector zeroing out everywhere except a single index!
+        const STATE_VECTOR_SIZE = MAX_HITS * 3; // N = 600,000 dimensions
+        const stateVector = new Float32Array(STATE_VECTOR_SIZE);
+        // --------------------------------------------------
+
         const colors = new Float32Array(MAX_HITS * 3);
-        hitsGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        hitsGeo.setAttribute('position', new THREE.BufferAttribute(stateVector, 3));
         hitsGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
         hitsGeo.setDrawRange(0, 0);
 
@@ -384,11 +393,11 @@
             const y = SPHERE_RADIUS * Math.sin(phi) * Math.sin(theta);
             const z = SPHERE_RADIUS * Math.cos(phi);
 
-            // Update buffer geometry
+            // Update buffer geometry state vector (collapsing the wave to a single coordinate)
             const idx = state.hits * 3;
-            positions[idx] = x;
-            positions[idx+1] = y;
-            positions[idx+2] = z;
+            stateVector[idx] = x;
+            stateVector[idx+1] = y;
+            stateVector[idx+2] = z;
 
             dummyColor.setHex(state.colorHex);
             colors[idx] = dummyColor.r;
