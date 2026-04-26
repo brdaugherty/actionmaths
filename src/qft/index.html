@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Field Theory - Zero-Point Field</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #000000;
+            --panel-bg: rgba(10, 10, 10, 0.85);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #22d3ee;
+            --accent-hover: #06b6d4;
+            --border: #334155;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: 'Inter', sans-serif;
+            color: var(--text-main);
+        }
+
+        #webgl-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        .ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            width: 380px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            pointer-events: auto;
+        }
+
+        h1 {
+            margin: 0 0 8px 0;
+            font-size: 1.3rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        p.desc {
+            margin: 0 0 20px 0;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background-color: rgba(34, 211, 238, 0.1);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+            width: 100%;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover {
+            background-color: var(--accent);
+            color: #000;
+            box-shadow: 0 0 15px rgba(34, 211, 238, 0.4);
+        }
+
+        .stats-box {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .stat strong {
+            color: #fff;
+            font-family: monospace;
+            font-size: 0.95rem;
+        }
+
+        .tip {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            color: rgba(255,255,255,0.6);
+            font-size: 0.85rem;
+            pointer-events: none;
+            letter-spacing: 0.5px;
+            text-align: center;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+            background-color: #10b981;
+            box-shadow: 0 0 8px #10b981;
+        }
+        .status-wave { background-color: #3b82f6; box-shadow: 0 0 8px #3b82f6; }
+        .status-collapse { background-color: #ef4444; box-shadow: 0 0 8px #ef4444; }
+
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="webgl-container"></div>
+    <div class="tip">Click anywhere on the field to trigger an emission</div>
+
+    <div class="ui-panel">
+        <h1>Quantum Field Theory Visualizer</h1>
+        <p class="desc">A visualization of the Zero-Point Field, probability waves, and non-local instantiation (wave function collapse).</p>
+
+        <div class="control-group">
+            <button id="btn-fire" class="btn">Trigger Emission</button>
+        </div>
+
+        <div class="stats-box">
+            <div class="stat">
+                <span>System State:</span> 
+                <strong><span id="val-status-color" class="status-indicator"></span><span id="val-state">Zero-Point Field Fluctuations</span></strong>
+            </div>
+            <div class="stat"><span>Wave Origin:</span> <strong id="val-origin">--</strong></div>
+            <div class="stat"><span>Collapse Coord:</span> <strong id="val-collapse">--</strong></div>
+            <div class="stat"><span>Total Collapses:</span> <strong id="val-hits">0</strong></div>
+        </div>
+    </div>
+
+    <!-- GLSL Shaders -->
+    <script id="vertexShader" type="x-shader/x-vertex">
+        uniform float u_time;
+        uniform vec2 u_waveOrigin;
+        uniform float u_waveStartTime;
+        uniform float u_isWaveActive;
+        uniform float u_collapsed;
+        uniform vec2 u_collapsePos;
+        uniform float u_collapseTime;
+        
+        varying float v_intensity;
+        varying vec2 v_uv;
+
+        // Simplex 2D noise
+        vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
+        float snoise(vec2 v){
+            const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+            vec2 i  = floor(v + dot(v, C.yy) );
+            vec2 x0 = v -   i + dot(i, C.xx);
+            vec2 i1;
+            i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+            vec4 x12 = x0.xyxy + C.xxzz;
+            x12.xy -= i1;
+            i = mod(i, 289.0);
+            vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 )) + i.x + vec3(0.0, i1.x, 1.0 ));
+            vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+            m = m*m; m = m*m;
+            vec3 x = 2.0 * fract(p * C.www) - 1.0;
+            vec3 h = abs(x) - 0.5;
+            vec3 ox = floor(x + 0.5);
+            vec3 a0 = x - ox;
+            m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
+            vec3 g;
+            g.x  = a0.x  * x0.x  + h.x  * x0.y;
+            g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+            return 130.0 * dot(m, g);
+        }
+
+        void main() {
+            v_uv = uv;
+            vec3 pos = position;
+            
+            // 1. ZPF Base Noise (The Substrate)
+            float noise = snoise(pos.xy * 0.15 + u_time * 0.5) * 0.5;
+            float totalZ = noise;
+            v_intensity = (noise + 1.0) * 0.2; // Base intensity
+
+            // 2. The Wave (Excitation)
+            if (u_isWaveActive > 0.5) {
+                float dist = distance(pos.xy, u_waveOrigin);
+                float waveAge = u_time - u_waveStartTime;
+                float currentRadius = waveAge * 20.0; // Wave speed
+                
+                // Ring effect
+                float ringThickness = 3.0;
+                if (dist < currentRadius && dist > currentRadius - ringThickness * 4.0) {
+                    float wavePhase = (currentRadius - dist) * 1.5;
+                    float waveAmp = sin(wavePhase) * exp(-(currentRadius - dist) * 0.2);
+                    totalZ += waveAmp * 3.0;
+                    v_intensity += max(0.0, waveAmp) * 0.8;
+                }
+            }
+
+            // 3. Instantiation (Collapse Spike)
+            if (u_collapsed > 0.5) {
+                float distToCollapse = distance(pos.xy, u_collapsePos);
+                float collapseAge = u_time - u_collapseTime;
+                
+                if (collapseAge < 2.0) {
+                    // Huge localized spike that rapidly decays
+                    float spikeAmp = exp(-distToCollapse * 2.0) * exp(-collapseAge * 2.0) * 15.0;
+                    totalZ += spikeAmp;
+                    v_intensity += spikeAmp * 0.5;
+                }
+            }
+
+            pos.z = totalZ;
+            
+            // Point size based on depth and intensity
+            vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+            gl_PointSize = (3.0 + v_intensity * 4.0) * (100.0 / -mvPosition.z);
+            gl_Position = projectionMatrix * mvPosition;
+        }
+    </script>
+
+    <script id="fragmentShader" type="x-shader/x-fragment">
+        varying float v_intensity;
+        varying vec2 v_uv;
+        
+        uniform float u_collapsed;
+        uniform float u_time;
+        uniform float u_collapseTime;
+
+        void main() {
+            // Circle particle shape
+            vec2 cxy = 2.0 * gl_PointCoord - 1.0;
+            float r = dot(cxy, cxy);
+            if (r > 1.0) discard;
+
+            // Color palette
+            vec3 zpfColor = vec3(0.1, 0.2, 0.4); // Deep blue for ZPF
+            vec3 waveColor = vec3(0.2, 0.8, 1.0); // Bright cyan for wave
+            vec3 collapseColor = vec3(1.0, 0.2, 0.4); // Red/Pink for collapse flash
+            
+            vec3 finalColor = zpfColor;
+            
+            // Add wave intensity
+            if (v_intensity > 0.4) {
+                finalColor = mix(zpfColor, waveColor, (v_intensity - 0.4) * 1.5);
+            }
+            
+            // Add collapse flash
+            if (u_collapsed > 0.5) {
+                float collapseAge = u_time - u_collapseTime;
+                if (collapseAge < 2.0) {
+                    float flashMix = exp(-collapseAge * 3.0) * min(1.0, v_intensity * 0.5);
+                    finalColor = mix(finalColor, collapseColor, flashMix);
+                }
+            }
+            
+            // Soft edges
+            float alpha = (1.0 - r) * min(1.0, v_intensity + 0.2);
+
+            gl_FragColor = vec4(finalColor, alpha);
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- App State ---
+        
+        // --- V2.0 MULTI-VECTOR APPROACH (HILBERT SPACE) ---
+        // The universe runs on a single mathematical engine: Linear Algebra acting on a Hilbert Space.
+        // For Quantum Field Theory, dimensionality N is extreme. The array no longer stores spatial coordinates,
+        // but rather the correlations (entanglement) between every point in the field.
+        // It is mathematically an NxN Tensor Space. Space and distance emerge from these relationships.
+        // While we use 3D graphics to visualize it here, the underlying State Tensor represents non-local topology.
+        const N_NODES = 150 * 150; // The grid segments
+        const STATE_TENSOR_SIZE = N_NODES * N_NODES; // Tensor representing correlations between all nodes
+        const stateTensor = new Float32Array(STATE_TENSOR_SIZE); // Conceptual backend for the QFT visualizer
+        // --------------------------------------------------
+        const state = {
+            isWaveActive: false,
+            collapsed: false,
+            waveOrigin: new THREE.Vector2(0, 0),
+            waveStartTime: 0,
+            collapsePos: new THREE.Vector2(0, 0),
+            collapseTime: 0,
+            hits: 0,
+            detectors: []
+        };
+
+        // --- UI Elements ---
+        const elState = document.getElementById('val-state');
+        const elStatusColor = document.getElementById('val-status-color');
+        const elOrigin = document.getElementById('val-origin');
+        const elCollapse = document.getElementById('val-collapse');
+        const elHits = document.getElementById('val-hits');
+
+        function updateUI() {
+            if (state.collapsed && (performance.now() / 1000 - state.collapseTime < 2.0)) {
+                elState.textContent = 'INSTANTIATION (COLLAPSE)';
+                elStatusColor.className = 'status-indicator status-collapse';
+            } else if (state.isWaveActive) {
+                elState.textContent = 'PROBABILITY WAVE PROPAGATING';
+                elStatusColor.className = 'status-indicator status-wave';
+            } else {
+                elState.textContent = 'ZERO-POINT FIELD FLUCTUATIONS';
+                elStatusColor.className = 'status-indicator';
+            }
+        }
+
+        // --- Three.js Setup ---
+        const container = document.getElementById('webgl-container');
+        const scene = new THREE.Scene();
+        
+        // Use a perspective camera angled to see the "Emergent Spacetime" grid deformation
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, -60, 60);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setClearColor(0x020205);
+        container.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2.1; // Don't go below ground
+
+        // --- The Field (ZPF & Grid) ---
+        const gridWidth = 200;
+        const gridHeight = 200;
+        const segments = 150;
+        
+        const fieldGeo = new THREE.PlaneGeometry(gridWidth, gridHeight, segments, segments);
+        
+        const uniforms = {
+            u_time: { value: 0.0 },
+            u_waveOrigin: { value: new THREE.Vector2(0, 0) },
+            u_waveStartTime: { value: 0.0 },
+            u_isWaveActive: { value: 0.0 },
+            u_collapsed: { value: 0.0 },
+            u_collapsePos: { value: new THREE.Vector2(0, 0) },
+            u_collapseTime: { value: 0.0 }
+        };
+
+        const fieldMat = new THREE.ShaderMaterial({
+            vertexShader: document.getElementById('vertexShader').textContent,
+            fragmentShader: document.getElementById('fragmentShader').textContent,
+            uniforms: uniforms,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+
+        const fieldMesh = new THREE.Points(fieldGeo, fieldMat);
+        scene.add(fieldMesh);
+
+        // Add a faint wireframe underneath to emphasize spacetime warping
+        const wireMat = new THREE.MeshBasicMaterial({ 
+            color: 0x112244, 
+            wireframe: true, 
+            transparent: true, 
+            opacity: 0.15,
+            depthWrite: false
+        });
+        // We use the same geometry so the vertices warp identically (if we updated them in CPU, but shader only updates GPU)
+        // Actually, to warp the wireframe we need to apply the shader to it as well!
+        const wireShaderMat = new THREE.ShaderMaterial({
+            vertexShader: document.getElementById('vertexShader').textContent,
+            fragmentShader: `
+                uniform float u_collapsed;
+                uniform float u_time;
+                uniform float u_collapseTime;
+                varying float v_intensity;
+                void main() {
+                    vec3 col = vec3(0.05, 0.1, 0.2);
+                    float alpha = 0.2 + v_intensity * 0.3;
+                    if (u_collapsed > 0.5 && (u_time - u_collapseTime < 2.0)) {
+                        col = mix(col, vec3(1.0, 0.2, 0.4), exp(-(u_time - u_collapseTime)*3.0) * 0.5);
+                    }
+                    gl_FragColor = vec4(col, alpha);
+                }
+            `,
+            uniforms: uniforms,
+            transparent: true,
+            wireframe: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        const wireMesh = new THREE.Mesh(fieldGeo, wireShaderMat);
+        scene.add(wireMesh);
+
+
+        // --- Detectors ---
+        const detectorGroup = new THREE.Group();
+        scene.add(detectorGroup);
+        
+        function createDetector(x, y) {
+            const geo = new THREE.SphereGeometry(1.5, 16, 16);
+            const mat = new THREE.MeshBasicMaterial({ 
+                color: 0xffaa00,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.8
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, y, 0);
+            detectorGroup.add(mesh);
+            
+            // Add a solid core
+            const coreGeo = new THREE.SphereGeometry(0.5, 16, 16);
+            const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const core = new THREE.Mesh(coreGeo, coreMat);
+            mesh.add(core);
+
+            state.detectors.push({ x, y, mesh });
+        }
+
+        // Place a few random detectors
+        for(let i=0; i<8; i++) {
+            createDetector(
+                (Math.random() - 0.5) * 160,
+                (Math.random() - 0.5) * 160
+            );
+        }
+
+        // --- Logic ---
+        const WAVE_SPEED = 20.0;
+
+        function fireWave(x, y) {
+            state.isWaveActive = true;
+            state.collapsed = false;
+            state.waveOrigin.set(x, y);
+            state.waveStartTime = performance.now() / 1000;
+            
+            uniforms.u_isWaveActive.value = 1.0;
+            uniforms.u_collapsed.value = 0.0;
+            uniforms.u_waveOrigin.value.copy(state.waveOrigin);
+            uniforms.u_waveStartTime.value = state.waveStartTime;
+
+            elOrigin.textContent = `[${x.toFixed(1)}, ${y.toFixed(1)}]`;
+            elCollapse.textContent = '--';
+            updateUI();
+        }
+
+        function triggerCollapse(detector) {
+            // The magic moment: Global state update (Logic Gate style)
+            state.isWaveActive = false; // Turn off the wave instantly globally
+            state.collapsed = true;
+            state.collapsePos.set(detector.x, detector.y);
+            state.collapseTime = performance.now() / 1000;
+            state.hits++;
+
+            uniforms.u_isWaveActive.value = 0.0;
+            uniforms.u_collapsed.value = 1.0;
+            uniforms.u_collapsePos.value.copy(state.collapsePos);
+            uniforms.u_collapseTime.value = state.collapseTime;
+
+            elCollapse.textContent = `[${detector.x.toFixed(1)}, ${detector.y.toFixed(1)}]`;
+            elHits.textContent = state.hits;
+            
+            // Visual pop on the detector
+            detector.mesh.scale.set(2, 2, 2);
+            
+            updateUI();
+        }
+
+        // --- Raycasting for Interaction ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        window.addEventListener('click', (event) => {
+            // Ignore clicks on UI
+            if (event.target.closest('.ui-panel')) return;
+
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            
+            // Create a mathematical plane at Z=0 for intersection
+            const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+            const target = new THREE.Vector3();
+            
+            if (raycaster.ray.intersectPlane(plane, target)) {
+                // Keep it within bounds
+                target.x = Math.max(-gridWidth/2, Math.min(gridWidth/2, target.x));
+                target.y = Math.max(-gridHeight/2, Math.min(gridHeight/2, target.y));
+                fireWave(target.x, target.y);
+            }
+        });
+
+        document.getElementById('btn-fire').addEventListener('click', () => {
+            fireWave((Math.random() - 0.5) * 50, (Math.random() - 0.5) * 50);
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = performance.now() / 1000;
+            uniforms.u_time.value = time;
+
+            // Physics checks
+            if (state.isWaveActive) {
+                const waveAge = time - state.waveStartTime;
+                const currentRadius = waveAge * WAVE_SPEED;
+
+                // Check resonance/collision with detectors
+                for (const d of state.detectors) {
+                    const dist = Math.hypot(d.x - state.waveOrigin.x, d.y - state.waveOrigin.y);
+                    
+                    // The Causal Handshake:
+                    // If the wave radius matches the distance to the detector...
+                    if (Math.abs(currentRadius - dist) < 0.5) {
+                        // ...there is a probabilistic chance of instantiation
+                        // (To make the demo feel responsive, we give it a relatively high chance, say 40%)
+                        if (Math.random() < 0.4) {
+                            triggerCollapse(d);
+                            break; // Stop checking, wave collapsed!
+                        }
+                    }
+                }
+                
+                // If wave goes way out of bounds without hitting anything, reset
+                if (currentRadius > gridWidth * 1.5) {
+                    state.isWaveActive = false;
+                    uniforms.u_isWaveActive.value = 0.0;
+                    updateUI();
+                }
+            }
+
+            // Animate detectors returning to normal size after flash
+            for (const d of state.detectors) {
+                if (d.mesh.scale.x > 1.0) {
+                    d.mesh.scale.x = Math.max(1.0, d.mesh.scale.x - 0.05);
+                    d.mesh.scale.y = Math.max(1.0, d.mesh.scale.y - 0.05);
+                    d.mesh.scale.z = Math.max(1.0, d.mesh.scale.z - 0.05);
+                }
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>

@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Perspective Journey - Emergent Spacetime</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #030305;
+            --panel-bg: rgba(10, 12, 16, 0.85);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #22d3ee;
+            --border: #334155;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: 'Inter', sans-serif;
+            color: var(--text-main);
+        }
+
+        #webgl-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        .ui-panel {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px 32px;
+            width: 600px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: var(--accent);
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .desc {
+            margin: 0;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            text-align: center;
+            line-height: 1.4;
+            height: 40px;
+        }
+
+        .slider-container {
+            position: relative;
+            padding: 10px 0;
+        }
+
+        .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .label {
+            transition: color 0.3s;
+        }
+
+        .label.active {
+            color: var(--accent);
+            text-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            position: relative;
+            z-index: 2;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+            margin-top: -8px;
+            box-shadow: 0 0 15px rgba(255,255,255,0.8);
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--border);
+            border-radius: 2px;
+        }
+
+        .track-highlight {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #3b82f6, #22d3ee, #ec4899);
+            z-index: 1;
+            border-radius: 2px;
+            width: 0%;
+        }
+
+        .instructions {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(255,255,255,0.5);
+            font-size: 0.8rem;
+            pointer-events: none;
+        }
+
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="webgl-container"></div>
+    <div class="instructions">Left-click to Rotate | Scroll to Zoom</div>
+
+    <div class="ui-panel">
+        <h1>The Perspective Journey</h1>
+        <div style="text-align:center; color:var(--accent); font-family:monospace; margin: -5px 0 10px 0; font-size: 0.85rem; letter-spacing: 1px;">Z-AXIS TIME: <span id="val-time">0.00</span></div>
+        <p id="desc-text" class="desc">A localized wave traveling through space over time.</p>
+        
+        <div class="slider-container">
+            <div class="slider-labels">
+                <span id="lbl-classical" class="label active">Classical</span>
+                <span id="lbl-block" class="label">Block Universe</span>
+                <span id="lbl-network" class="label">Entanglement</span>
+            </div>
+            <div class="track-highlight" id="track-hl"></div>
+            <input type="range" id="paradigm-slider" min="0" max="2" step="0.001" value="0">
+        </div>
+    </div>
+
+    <!-- Shaders -->
+    <script id="vertexShader" type="x-shader/x-vertex">
+        uniform float u_transition; // 0.0 to 2.0
+        uniform float u_time; // global animated time 0 to 50
+        
+        attribute vec3 a_blockPos;
+        attribute vec3 a_networkPos;
+        attribute float a_time;
+        attribute float a_isWave;
+
+        varying float v_opacity;
+        varying vec3 v_color;
+
+        void main() {
+            vec3 posClassical = position;
+            vec3 posBlock = a_blockPos;
+            vec3 posNetwork = a_networkPos;
+            
+            vec3 finalPos;
+            
+            // Morphing Logic
+            if (u_transition < 1.0) {
+                // Smooth easing for morphing
+                float t = smoothstep(0.0, 1.0, u_transition);
+                finalPos = mix(posClassical, posBlock, t);
+            } else {
+                float t = smoothstep(0.0, 1.0, u_transition - 1.0);
+                finalPos = mix(posBlock, posNetwork, t);
+            }
+            
+            // Add a slight rotation to the network just to make it feel alive
+            if (u_transition > 1.0) {
+                float angle = u_time * 0.1 * (u_transition - 1.0);
+                float s = sin(angle);
+                float c = cos(angle);
+                finalPos.xz = mat2(c, -s, s, c) * finalPos.xz;
+            }
+
+            // --- Opacity Logic ---
+            float op = 0.05; // Base faint field
+            
+            if (a_isWave > 0.5) {
+                // It's a wave particle
+                op = 0.9;
+                
+                // In Classical (0.0), wave only appears when its a_time matches u_time (the moving ring effect)
+                // In Block (1.0), the whole cone is visible permanently
+                float timeDist = abs(a_time - u_time);
+                float isCurrentTime = 1.0 - clamp(timeDist * 0.8, 0.0, 1.0);
+                
+                // Blend from "only current time" to "always visible history"
+                op = mix(isCurrentTime * 0.9, 0.5, u_transition);
+            }
+            
+            // Network mode adjustments
+            if (u_transition > 1.0) {
+                float t = u_transition - 1.0;
+                if (a_isWave < 0.5) {
+                    // Fade out the base field slightly but keep nodes visible
+                    op = mix(op, 0.25, t);
+                } else {
+                    // Make the wave (now the entanglement thread) glow brightly
+                    op = mix(op, 0.8, t);
+                }
+            }
+
+            // Fade edges of the grid based on distance to center
+            float distToCenter = length(a_blockPos.xy);
+            op *= 1.0 - smoothstep(40.0, 50.0, distToCenter);
+
+            v_opacity = max(0.0, op);
+
+            // --- Color Logic ---
+            if (a_isWave > 0.5) {
+                v_color = vec3(0.1, 0.8, 1.0); // Cyan wave
+            } else {
+                v_color = vec3(0.2, 0.4, 0.8); // Deep blue field
+            }
+            
+            // Morph wave color to pinkish/red in Network mode
+            if (u_transition > 1.0) {
+                float t = u_transition - 1.0;
+                if (a_isWave > 0.5) {
+                    v_color = mix(v_color, vec3(1.0, 0.2, 0.5), t);
+                }
+            }
+
+            // Size logic
+            float pSize = 2.0;
+            if (a_isWave > 0.5) pSize = 4.0;
+            
+            vec4 mvPosition = modelViewMatrix * vec4(finalPos, 1.0);
+            gl_PointSize = pSize * (150.0 / -mvPosition.z);
+            gl_Position = projectionMatrix * mvPosition;
+        }
+    </script>
+
+    <script id="fragmentShader" type="x-shader/x-fragment">
+        varying float v_opacity;
+        varying vec3 v_color;
+
+        void main() {
+            // Soft circular particle
+            vec2 cxy = 2.0 * gl_PointCoord - 1.0;
+            float r = dot(cxy, cxy);
+            if (r > 1.0) discard;
+            
+            float alpha = (1.0 - r) * v_opacity;
+            gl_FragColor = vec4(v_color, alpha);
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- Three.js Setup ---
+        const container = document.getElementById('webgl-container');
+        const scene = new THREE.Scene();
+        
+        // Initial camera position (looking top-down at an angle for classical view)
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, -90, 60);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setClearColor(0x020205);
+        container.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        // Restrict angles slightly to maintain immersion
+        controls.maxDistance = 200;
+        controls.minDistance = 20;
+
+        // --- Data Generation (150k particles) ---
+        const NUM_FIELD = 100000;
+        const NUM_WAVE = 50000;
+        const TOTAL = NUM_FIELD + NUM_WAVE;
+
+        const posClassical = new Float32Array(TOTAL * 3);
+        const posBlock = new Float32Array(TOTAL * 3);
+        const posNetwork = new Float32Array(TOTAL * 3);
+        const aTime = new Float32Array(TOTAL);
+        const aIsWave = new Float32Array(TOTAL);
+
+        const MAX_TIME = 40.0;
+        const WAVE_SPEED = 1.0;
+
+        // 1. Generate The Field Substrate
+        for (let i = 0; i < NUM_FIELD; i++) {
+            let idx = i * 3;
+            
+            // Random point in a 2D plane (radius 50)
+            let r = Math.sqrt(Math.random()) * 50;
+            let theta = Math.random() * Math.PI * 2;
+            let x = r * Math.cos(theta);
+            let y = r * Math.sin(theta);
+            let t = Math.random() * MAX_TIME; // Historical time slice
+            
+            // Classical: Flat plane at Z=0
+            posClassical[idx] = x;
+            posClassical[idx+1] = y;
+            posClassical[idx+2] = (Math.random() - 0.5) * 1.5; // slight Z-noise
+            
+            // Block Universe: Z becomes Time
+            posBlock[idx] = x;
+            posBlock[idx+1] = y;
+            posBlock[idx+2] = t; // Z is Time!
+            
+            // Network: Chaotic spherical point cloud
+            let netR = 30 + Math.random() * 25;
+            let netPhi = Math.acos(Math.random() * 2 - 1);
+            let netTheta = Math.random() * Math.PI * 2;
+            posNetwork[idx] = netR * Math.sin(netPhi) * Math.cos(netTheta);
+            posNetwork[idx+1] = netR * Math.sin(netPhi) * Math.sin(netTheta);
+            posNetwork[idx+2] = netR * Math.cos(netPhi);
+
+            aTime[i] = t;
+            aIsWave[i] = 0.0; // Field
+        }
+
+        // 2. Generate The Wave (The Light Cone / The Entanglement Thread)
+        for (let i = 0; i < NUM_WAVE; i++) {
+            let offset = NUM_FIELD;
+            let idx = (offset + i) * 3;
+            
+            let t = Math.random() * MAX_TIME;
+            let radiusAtTime = t * WAVE_SPEED;
+            let theta = Math.random() * Math.PI * 2;
+            
+            let x = radiusAtTime * Math.cos(theta);
+            let y = radiusAtTime * Math.sin(theta);
+
+            // Classical: Expands on the plane
+            posClassical[idx] = x;
+            posClassical[idx+1] = y;
+            posClassical[idx+2] = 0.0;
+
+            // Block Universe: Forms a perfect 3D Cone
+            posBlock[idx] = x;
+            posBlock[idx+1] = y;
+            posBlock[idx+2] = t;
+
+            // Network: The entire wave history collapses into a dense geometric connection
+            // We scatter 85% of these points into the background network so the thread isn't a solid blinding band
+            if (Math.random() > 0.15) {
+                let netR = 30 + Math.random() * 25;
+                let netPhi = Math.acos(Math.random() * 2 - 1);
+                let netTheta = Math.random() * Math.PI * 2;
+                posNetwork[idx] = netR * Math.sin(netPhi) * Math.cos(netTheta);
+                posNetwork[idx+1] = netR * Math.sin(netPhi) * Math.sin(netTheta);
+                posNetwork[idx+2] = netR * Math.cos(netPhi);
+            } else {
+                // The remaining 15% form a loosely clustered entanglement thread
+                let progress = t / MAX_TIME; // 0 to 1
+                let lineLen = 60;
+                posNetwork[idx] = (progress - 0.5) * lineLen + (Math.random()-0.5) * 6.0;
+                posNetwork[idx+1] = (Math.random()-0.5) * 6.0;
+                posNetwork[idx+2] = (Math.random()-0.5) * 6.0;
+            }
+
+            aTime[offset + i] = t;
+            aIsWave[offset + i] = 1.0; // Wave
+        }
+
+        // Build Geometry
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(posClassical, 3));
+        geometry.setAttribute('a_blockPos', new THREE.BufferAttribute(posBlock, 3));
+        geometry.setAttribute('a_networkPos', new THREE.BufferAttribute(posNetwork, 3));
+        geometry.setAttribute('a_time', new THREE.BufferAttribute(aTime, 1));
+        geometry.setAttribute('a_isWave', new THREE.BufferAttribute(aIsWave, 1));
+
+        // Shader Material
+        const material = new THREE.ShaderMaterial({
+            vertexShader: document.getElementById('vertexShader').textContent,
+            fragmentShader: document.getElementById('fragmentShader').textContent,
+            uniforms: {
+                u_transition: { value: 0.0 },
+                u_time: { value: 0.0 }
+            },
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+
+        const points = new THREE.Points(geometry, material);
+        
+        // Offset everything so the cone grows "up" from center visually
+        points.position.z = -20; 
+        scene.add(points);
+
+        // --- UI & Interactions ---
+        const slider = document.getElementById('paradigm-slider');
+        const trackHl = document.getElementById('track-hl');
+        const descText = document.getElementById('desc-text');
+        
+        const lblClass = document.getElementById('lbl-classical');
+        const lblBlock = document.getElementById('lbl-block');
+        const lblNet = document.getElementById('lbl-network');
+
+        const descriptions = [
+            "Classical: A localized wave travels outward through empty space over a specific duration.",
+            "Block Universe: Time is a physical dimension (Z-axis). The wave is actually a static 3D 'Light Cone' of probability.",
+            "Entanglement: Space is a relational network. Instantiation is a direct geometric bridge forming between nodes, bypassing 'distance'."
+        ];
+
+        // We use camera target morphing to enhance the transition!
+        const camClassical = { pos: new THREE.Vector3(0, -90, 60), target: new THREE.Vector3(0, 0, -20) };
+        const camBlock = { pos: new THREE.Vector3(-60, -60, 40), target: new THREE.Vector3(0, 0, 0) };
+        const camNet = { pos: new THREE.Vector3(0, -80, 0), target: new THREE.Vector3(0, 0, -20) };
+
+        slider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            material.uniforms.u_transition.value = val;
+            
+            // Update UI Track
+            trackHl.style.width = (val / 2.0) * 100 + '%';
+
+            // Highlight Labels & Text
+            lblClass.className = val < 0.5 ? 'label active' : 'label';
+            lblBlock.className = (val >= 0.5 && val < 1.5) ? 'label active' : 'label';
+            lblNet.className = val >= 1.5 ? 'label active' : 'label';
+
+            if (val < 0.5) descText.textContent = descriptions[0];
+            else if (val < 1.5) descText.textContent = descriptions[1];
+            else descText.textContent = descriptions[2];
+
+            // Smoothly morph camera position (only if user hasn't explicitly orbited heavily)
+            // For a robust app we'd use Tween.js, but a simple LERP here keeps it self-contained
+            if (val < 1.0) {
+                camera.position.lerpVectors(camClassical.pos, camBlock.pos, val);
+                controls.target.lerpVectors(camClassical.target, camBlock.target, val);
+            } else {
+                camera.position.lerpVectors(camBlock.pos, camNet.pos, val - 1.0);
+                controls.target.lerpVectors(camBlock.target, camNet.target, val - 1.0);
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- Animation Loop ---
+        let clock = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Time loop for the Classical Wave
+            clock += 0.15;
+            if (clock > MAX_TIME) clock = 0;
+            material.uniforms.u_time.value = clock;
+            document.getElementById('val-time').textContent = clock.toFixed(2);
+
+            // Slowly auto-rotate the entire scene to give it life
+            points.rotation.z += 0.001;
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>

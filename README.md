@@ -51,3 +51,19 @@ A conceptual expansion of the Dyson Sphere simulator that visually answers: *Wha
 *   **If it hits (15% chance):** The wave instantly collapses and flashes entirely onto the intermediate planet.
 *   **If it misses (85% chance):** The wave ignores the planet and passes through, collapsing "elsewhere" on the outer Dyson shell.
 
+#### Quantum Field Theory Visualizer
+**[Play Live Demo](https://brdaugherty.github.io/actionmaths/src/qft/) | [Download Source](src/qft/index.html?raw=true)**
+
+This visualization illustrates the relationship between the Zero-Point Field, spherical probability waves, and localized instantiation. It demonstrates that a wave "collapse" is not a particle traveling through space, but rather an instantaneous global state update across the underlying quantum field substrate.
+
+*   **Click anywhere** to emit a probability wave.
+*   Watch as the wave intersects with yellow detectors. Upon resonance, the wave instantly collapses via a global state update.
+*   Observe the underlying "spacetime grid" deforming only in response to energy excitations, visualizing emergent spacetime.
+
+#### Perspective Journey: Emergent Spacetime
+**[Play Live Demo](https://brdaugherty.github.io/actionmaths/src/journey/) | [Download Source](src/journey/index.html?raw=true)**
+
+An interactive exploration of how space and time arise from a quantum field. Use the slider to smoothly morph reality between three paradigms:
+1. **Classical**: Time ticks forward as objects move through a rigid 2D plane.
+2. **Block Universe**: Time is exposed as a physical 3D axis. Waves are revealed as static geometric "Light Cones" of probability history.
+3. **Entanglement**: The grid of space shatters into a relational network. Instantaneous wave collapse is visualized as a physical, non-local bridge forming between quantum nodes.
