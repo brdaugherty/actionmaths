@@ -1,14 +1,16 @@
 # actionmaths
+Maths in action
 
-Maths in action. Browser-native, interactive physics and probability simulations using Three.js and Vanilla JS.
+Concepts and theory, visualized. Simply, act to know.
+
+📖 **[Read the Physics Details & Theory Guide](DETAILS.md)** for a deep dive into the quantum mechanics and theoretical math powering these simulations.
 
 ---
 
-### Getting Started
+### 🚀 How to Use
+All simulations run directly in your browser using pure HTML/JavaScript.
 
-Explore the simulations below by following these steps:
-
-*   **Play Live:** Click "Play Live Demo" to open the interactive simulation in your browser via GitHub Pages.
+*   **Live Demo:** Click the "Play Live Demo" link under any experiment.
 *   **Run Locally:** Right-click "Download Source", save the file, and drag it into a new browser tab.
 *   **Experiment:** Modify the source code in a text editor and refresh your tab to see the math change in real-time.
 
@@ -65,3 +67,12 @@ An interactive exploration of how space and time arise from a quantum field. Use
 1. **Classical**: Time ticks forward as objects move through a rigid 2D plane.
 2. **Block Universe**: Time is exposed as a physical 3D axis. Waves are revealed as static geometric "Light Cones" of probability history.
 3. **Entanglement**: The grid of space shatters into a relational network. Instantaneous wave collapse is visualized as a physical, non-local bridge forming between quantum nodes.
+
+#### Optical Depth: The Lookback Limit
+**[Play Live Demo](https://brdaugherty.github.io/actionmaths/src/opticaldepth/) | [Download Source](src/opticaldepth/index.html)**
+
+A visualization of the "Opaque Era" of the early universe. It reframes the dense plasma of the Big Bang as a **Probability Bottleneck**, modeled here using a Hilbert Space vector network.
+
+*   **Timeline Slider:** Drag the slider from the "Big Bang" to "Recombination" to dynamically alter the Optical Depth (density) of the network.
+*   **High Density:** The state vector (probability wave) collapses almost instantly due to high decoherence pressure, resulting in frantic, short jumps.
+*   **Low Density:** The photon successfully propagates across the network, forming long-range correlations and massive "jumps".

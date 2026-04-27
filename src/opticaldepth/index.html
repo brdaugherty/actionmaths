@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optical Depth - The Lookback Limit</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #030305;
+            --panel-bg: rgba(10, 15, 20, 0.85);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #f97316; /* Starts orange */
+            --border: #334155;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: 'Inter', sans-serif;
+            color: var(--text-main);
+        }
+
+        #webgl-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        .ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            width: 360px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            pointer-events: auto;
+            transition: border-color 0.5s;
+        }
+
+        h1 {
+            margin: 0 0 8px 0;
+            font-size: 1.3rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: color 0.5s;
+        }
+
+        p.desc {
+            margin: 0 0 20px 0;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            width: 100%;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover {
+            background-color: var(--accent);
+            color: #000;
+        }
+        
+        .btn.active {
+            background-color: var(--accent);
+            color: #000;
+        }
+
+        .slider-box {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .slider-box label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            margin-top: -6px;
+            transition: background 0.5s;
+        }
+
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--border);
+            border-radius: 2px;
+        }
+
+        .stats-box {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .stat strong {
+            color: #fff;
+            font-family: monospace;
+            font-size: 1rem;
+        }
+
+        .tip {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            color: rgba(255,255,255,0.5);
+            font-size: 0.85rem;
+            pointer-events: none;
+        }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="webgl-container"></div>
+    <div class="tip">Left-click to Rotate | Right-click to Pan | Scroll to Zoom</div>
+
+    <div class="ui-panel" id="main-panel">
+        <h1 id="title-text">Optical Depth</h1>
+        <p class="desc">Visualize the probability bottleneck of the early universe. Watch the state vector collapse in a dense Hilbert Space.</p>
+
+        <div class="control-group">
+            <button id="btn-fire" class="btn">Emit Search Pulse (Spacebar)</button>
+            <button id="btn-stream" class="btn">Toggle Continuous Emission</button>
+        </div>
+
+        <div class="slider-box">
+            <label><span>Timeline (Universe Era)</span></label>
+            <input type="range" id="slider-timeline" min="0" max="1" step="0.01" value="0">
+            <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#94a3b8; margin-top:2px;">
+                <span>Big Bang (Dense)</span>
+                <span>Recombination (Sparse)</span>
+            </div>
+        </div>
+
+        <div class="slider-box">
+            <label><span>Hilbert Space Nodes (N)</span> <span id="val-nodes">400</span></label>
+            <input type="range" id="slider-nodes" min="50" max="1000" step="10" value="400">
+        </div>
+
+        <div class="stats-box">
+            <div class="stat">Optical Depth (τ): <strong id="val-tau" style="color: #ef4444;">0.99</strong></div>
+            <div class="stat">Mean Free Path: <strong id="val-mfp">Very Short</strong></div>
+            <div class="stat">Largest Jump: <strong id="val-jump">0.0</strong></div>
+        </div>
+    </div>
+
+    <!-- Node Shader -->
+    <script id="nodeVertexShader" type="x-shader/x-vertex">
+        attribute float a_amplitude;
+        uniform float u_baseSize;
+        uniform vec3 u_color;
+        
+        varying float v_amp;
+        varying vec3 v_color;
+
+        void main() {
+            v_amp = a_amplitude;
+            v_color = u_color;
+            
+            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+            
+            // Nodes glow brighter and larger when they have probability amplitude
+            gl_PointSize = u_baseSize * (1.0 + a_amplitude * 15.0) * (200.0 / -mvPosition.z);
+            gl_Position = projectionMatrix * mvPosition;
+        }
+    </script>
+
+    <script id="nodeFragmentShader" type="x-shader/x-fragment">
+        varying float v_amp;
+        varying vec3 v_color;
+
+        void main() {
+            vec2 cxy = 2.0 * gl_PointCoord - 1.0;
+            float r = dot(cxy, cxy);
+            if (r > 1.0) discard;
+            
+            // Base node is dim. Amplified nodes are bright and shift towards white
+            vec3 finalColor = mix(v_color * 0.3, vec3(1.0, 1.0, 1.0), min(1.0, v_amp * 2.0));
+            float alpha = (1.0 - r) * (0.4 + min(0.6, v_amp));
+
+            gl_FragColor = vec4(finalColor, alpha);
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- App State ---
+        const MAX_NODES = 1000;
+        const RADIUS = 100;
+        
+        const state = {
+            timeline: 0.0, // 0 = Big Bang, 1 = Recombination
+            density: 0.99, // Chance of collapse per frame
+            activeNodes: 400,
+            isStreaming: false,
+            largestJump: 0,
+            colorHex: 0xf97316 // Start orange
+        };
+
+        // Arrays for Hilbert Space
+        const positions = new Float32Array(MAX_NODES * 3);
+        const psi = new Float32Array(MAX_NODES); // Probability amplitudes |c_i|^2
+        const nextPsi = new Float32Array(MAX_NODES);
+        const neighbors = []; // Adjacency list
+
+        let activeWave = false;
+        let startNode = 0;
+
+        // --- Three.js Setup ---
+        const container = document.getElementById('webgl-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x030305, 0.004);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0, 180);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.5;
+
+        // --- Network Generation ---
+        function generateNetwork() {
+            for (let i = 0; i < MAX_NODES; i++) {
+                let r = Math.cbrt(Math.random()) * RADIUS; // Uniform sphere distribution
+                let theta = Math.random() * 2 * Math.PI;
+                let phi = Math.acos(2 * Math.random() - 1);
+                
+                positions[i*3] = r * Math.sin(phi) * Math.cos(theta);
+                positions[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+                positions[i*3+2] = r * Math.cos(phi);
+                
+                neighbors[i] = [];
+            }
+            
+            // Calculate neighbors (connect each node to its 6 closest neighbors)
+            for (let i = 0; i < MAX_NODES; i++) {
+                let dists = [];
+                for (let j = 0; j < MAX_NODES; j++) {
+                    if (i === j) continue;
+                    let dx = positions[i*3] - positions[j*3];
+                    let dy = positions[i*3+1] - positions[j*3+1];
+                    let dz = positions[i*3+2] - positions[j*3+2];
+                    dists.push({ index: j, dSq: dx*dx + dy*dy + dz*dz });
+                }
+                dists.sort((a, b) => a.dSq - b.dSq);
+                for(let k=0; k<6; k++) {
+                    neighbors[i].push(dists[k].index);
+                }
+            }
+        }
+
+        generateNetwork();
+
+        // --- Visual Objects ---
+        
+        // 1. Nodes (Points)
+        const nodesGeo = new THREE.BufferGeometry();
+        nodesGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        nodesGeo.setAttribute('a_amplitude', new THREE.BufferAttribute(psi, 1));
+        
+        const nodesMat = new THREE.ShaderMaterial({
+            vertexShader: document.getElementById('nodeVertexShader').textContent,
+            fragmentShader: document.getElementById('nodeFragmentShader').textContent,
+            uniforms: {
+                u_baseSize: { value: 3.0 },
+                u_color: { value: new THREE.Color(state.colorHex) }
+            },
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        
+        const nodesMesh = new THREE.Points(nodesGeo, nodesMat);
+        scene.add(nodesMesh);
+
+        // 2. Ghost Edges (Lines)
+        const edgesGeo = new THREE.BufferGeometry();
+        // Allocate space for lines. Max lines = activeNodes * 3 (since 6 neighbors, undirected ~3 edges per node)
+        // We will build this dynamically in render loop to only show active connections
+        const edgePositions = new Float32Array(MAX_NODES * 6 * 3 * 2); 
+        edgesGeo.setAttribute('position', new THREE.BufferAttribute(edgePositions, 3));
+        
+        const edgesMat = new THREE.LineBasicMaterial({
+            color: state.colorHex,
+            transparent: true,
+            opacity: 0.1,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        
+        const edgesMesh = new THREE.LineSegments(edgesGeo, edgesMat);
+        scene.add(edgesMesh);
+
+        function updateEdges() {
+            let edgeCount = 0;
+            // Draw edges only between active nodes
+            for (let i = 0; i < state.activeNodes; i++) {
+                for (let j of neighbors[i]) {
+                    if (j < state.activeNodes && i < j) { // i < j prevents drawing twice
+                        edgePositions[edgeCount++] = positions[i*3];
+                        edgePositions[edgeCount++] = positions[i*3+1];
+                        edgePositions[edgeCount++] = positions[i*3+2];
+                        
+                        edgePositions[edgeCount++] = positions[j*3];
+                        edgePositions[edgeCount++] = positions[j*3+1];
+                        edgePositions[edgeCount++] = positions[j*3+2];
+                    }
+                }
+            }
+            edgesGeo.setDrawRange(0, edgeCount / 3);
+            edgesGeo.attributes.position.needsUpdate = true;
+        }
+        updateEdges();
+
+        // 3. Flashes (Instant Recollapse indicators)
+        const flashGeo = new THREE.SphereGeometry(1, 16, 16);
+        let activeFlashes = [];
+
+        function spawnFlash(x, y, z) {
+            const mat = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 1.0,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const mesh = new THREE.Mesh(flashGeo, mat);
+            mesh.position.set(x, y, z);
+            scene.add(mesh);
+            activeFlashes.push({ mesh, life: 1.0 });
+        }
+
+        // --- Logic ---
+        
+        function firePulse() {
+            // Reset state vector
+            for(let i=0; i<state.activeNodes; i++) psi[i] = 0;
+            
+            // Pick a random starting node near the center
+            startNode = Math.floor(Math.random() * state.activeNodes);
+            psi[startNode] = 1.0;
+            nodesGeo.attributes.a_amplitude.needsUpdate = true;
+            activeWave = true;
+        }
+
+        function collapse(nodeIndex) {
+            // Calculate jump distance
+            let dx = positions[startNode*3] - positions[nodeIndex*3];
+            let dy = positions[startNode*3+1] - positions[nodeIndex*3+1];
+            let dz = positions[startNode*3+2] - positions[nodeIndex*3+2];
+            let dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+            
+            if (dist > state.largestJump) {
+                state.largestJump = dist;
+                document.getElementById('val-jump').textContent = state.largestJump.toFixed(1);
+            }
+
+            // Flash effect
+            spawnFlash(positions[nodeIndex*3], positions[nodeIndex*3+1], positions[nodeIndex*3+2]);
+
+            // Reset wave
+            for(let i=0; i<state.activeNodes; i++) psi[i] = 0;
+            nodesGeo.attributes.a_amplitude.needsUpdate = true;
+            activeWave = false;
+        }
+
+        // --- Color & Timeline Interpolation ---
+        const colorStart = new THREE.Color(0xff3300); // Red/Orange (Big Bang)
+        const colorEnd = new THREE.Color(0x00d8ff); // Cyan/Blue (Recombination)
+        const rootStyle = document.documentElement.style;
+
+        function updateTimeline() {
+            // Timeline 0.0 -> Density 0.99
+            // Timeline 1.0 -> Density 0.01
+            // Use exponential curve so it stays dense longer
+            state.density = 0.01 + 0.98 * Math.pow(1.0 - state.timeline, 3.0);
+            
+            // Update Colors
+            const c = colorStart.clone().lerp(colorEnd, state.timeline);
+            nodesMat.uniforms.u_color.value = c;
+            edgesMat.color = c;
+            
+            // Update UI Theme Color
+            const hex = '#' + c.getHexString();
+            rootStyle.setProperty('--accent', hex);
+            
+            // Update UI Stats
+            const tauEl = document.getElementById('val-tau');
+            tauEl.textContent = state.density.toFixed(3);
+            
+            // Color code the text
+            if (state.density > 0.6) tauEl.style.color = '#ef4444'; // Red
+            else if (state.density > 0.2) tauEl.style.color = '#eab308'; // Yellow
+            else tauEl.style.color = '#10b981'; // Green
+
+            const mfpEl = document.getElementById('val-mfp');
+            if (state.density > 0.8) mfpEl.textContent = "Extremely Short (Micro-jumps)";
+            else if (state.density > 0.4) mfpEl.textContent = "Short (Trapped)";
+            else if (state.density > 0.1) mfpEl.textContent = "Medium (Expanding)";
+            else mfpEl.textContent = "Long (Free Streaming)";
+        }
+
+        // --- Event Listeners ---
+        document.getElementById('btn-fire').addEventListener('click', () => {
+            if (!activeWave) firePulse();
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (!activeWave) firePulse();
+            }
+        });
+
+        const btnStream = document.getElementById('btn-stream');
+        btnStream.addEventListener('click', () => {
+            state.isStreaming = !state.isStreaming;
+            btnStream.classList.toggle('active', state.isStreaming);
+            btnStream.textContent = state.isStreaming ? 'Stop Emission' : 'Toggle Continuous Emission';
+        });
+
+        document.getElementById('slider-timeline').addEventListener('input', (e) => {
+            state.timeline = parseFloat(e.target.value);
+            updateTimeline();
+        });
+
+        document.getElementById('slider-nodes').addEventListener('input', (e) => {
+            state.activeNodes = parseInt(e.target.value);
+            document.getElementById('val-nodes').textContent = state.activeNodes;
+            
+            // Hide nodes above activeNodes
+            nodesGeo.setDrawRange(0, state.activeNodes);
+            updateEdges();
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Initialize UI
+        nodesGeo.setDrawRange(0, state.activeNodes);
+        updateTimeline();
+
+        // --- Main Animation Loop ---
+        let lastTime = performance.now();
+        let streamTimer = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const now = performance.now();
+            const dt = (now - lastTime) / 1000;
+            lastTime = now;
+
+            if (state.isStreaming) {
+                streamTimer += dt;
+                // Auto fire if not active, or if it's been a while (to ensure constant activity)
+                if (!activeWave && streamTimer > 0.1) {
+                    firePulse();
+                    streamTimer = 0;
+                }
+            }
+
+            if (activeWave) {
+                // 1. Unitary Evolution (Spread Amplitude)
+                for(let i=0; i<state.activeNodes; i++) nextPsi[i] = 0;
+                
+                let totalAmp = 0;
+                for(let i=0; i<state.activeNodes; i++) {
+                    if (psi[i] > 0.0001) {
+                        // Keep 40% of amplitude here
+                        nextPsi[i] += psi[i] * 0.4;
+                        
+                        // Spread 60% equally among valid neighbors
+                        let validNeighbors = neighbors[i].filter(n => n < state.activeNodes);
+                        if (validNeighbors.length > 0) {
+                            let share = (psi[i] * 0.6) / validNeighbors.length;
+                            for(let j of validNeighbors) {
+                                nextPsi[j] += share;
+                            }
+                        } else {
+                            // If no neighbors, keep all
+                            nextPsi[i] += psi[i] * 0.6;
+                        }
+                    }
+                }
+                
+                // Copy back and boost slightly to counteract dissipation visually
+                for(let i=0; i<state.activeNodes; i++) {
+                    psi[i] = Math.min(1.0, nextPsi[i] * 1.05); 
+                    totalAmp += psi[i];
+                }
+                
+                nodesGeo.attributes.a_amplitude.needsUpdate = true;
+
+                // 2. Decoherence Pressure (Optical Depth Check)
+                // The larger the probability wave spreads, the more "surface area" it has to hit something.
+                // We model this by multiplying the base density by the total amplitude spread.
+                let collapseChance = state.density * Math.min(10.0, totalAmp * 0.5);
+                
+                if (Math.random() < collapseChance || totalAmp < 0.01) {
+                    // Weighted random choice for collapse node
+                    let r = Math.random() * totalAmp;
+                    let acc = 0;
+                    let targetNode = startNode;
+                    for(let i=0; i<state.activeNodes; i++) {
+                        acc += psi[i];
+                        if (r <= acc) {
+                            targetNode = i;
+                            break;
+                        }
+                    }
+                    collapse(targetNode);
+                }
+            }
+
+            // Update Flashes
+            for (let i = activeFlashes.length - 1; i >= 0; i--) {
+                const flash = activeFlashes[i];
+                flash.life -= dt * 3.0; // Fade out rapidly
+                if (flash.life <= 0) {
+                    scene.remove(flash.mesh);
+                    flash.mesh.material.dispose();
+                    flash.mesh.geometry.dispose();
+                    activeFlashes.splice(i, 1);
+                } else {
+                    const scale = 1.0 + (1.0 - flash.life) * 5.0; // Explode outward
+                    flash.mesh.scale.set(scale, scale, scale);
+                    flash.mesh.material.opacity = flash.life;
+                }
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
